@@ -1,35 +1,5 @@
-#include <stdint.h>
-#include <stdio.h>
+#include "./common.h"
 
-#define internal static
-#define global   static
-#define persist  static
-
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-typedef int8_t   s8;
-typedef int16_t  s16;
-typedef int32_t  s32;
-typedef int64_t  s64;
-
-typedef int8_t   b8;
-typedef int16_t  b16;
-typedef int32_t  b32;
-typedef int64_t  b64;
-
-typedef float    f32;
-typedef double   f64;
-
-typedef struct Buffer
-{
-    u32 size;
-    u8 *data;
-} Buffer;
-
-typedef Buffer String;
 
 typedef enum TokenKind
 {
@@ -45,10 +15,44 @@ typedef struct Token
     struct Token *next_token;
 } Token;
 
+internal Buffer
+read_entire_file(char *filename)
+{
+    Buffer result = {0};
+
+    FILE *file = fopen(filename, "rb");
+    // NOTE(michiel): Get the file size
+    fseek(file, 0, SEEK_END);
+    result.size = safe_truncate_to_u32(ftell(file));
+    // NOTE(michiel): Reset the current file pointer to the beginning
+    fseek(file, 0, SEEK_SET);
+    // NOTE(michiel): Allocate memory for the file data
+    result.data = allocate_array(result.size, u8, 0);
+    // NOTE(michiel): Read the actual data from the file
+    s64 bytesRead = fread(result.data, 1, result.size, file);
+    i_expect(bytesRead == (s64)result.size);
+    fclose(file);
+
+    return result;
+}
+
+#define MAX_TOKEN_MEM_CHUNK 2048
 internal Token *
 tokenize(char *filename)
 {
-    Token *result = NULL;
+    // NOTE(michiel): Example of allocating token memory in chunks until we run out of chunks
+    s32 memRemaining = (s32)MAX_TOKEN_MEM_CHUNK;
+    unused(memRemaining);
+    Token *result = allocate_array(MAX_TOKEN_MEM_CHUNK, Token, 0);
+
+    Buffer fileBuffer = read_entire_file(filename);
+
+    char *scanner = (char *)fileBuffer.data;
+    while (*scanner)
+    {
+        ++scanner;
+    }
+    deallocate(fileBuffer.data);
 
     return result;
 }
@@ -75,7 +79,14 @@ print_tokens(Token *tokens)
     {
         fprintf(stdout, "<Token kind=");
         print_token_kind(it);
-        fprintf(stdout, ", value=%.*s>\n", it->value.size, it->value.data);
+        if (it->value.size)
+        {
+            fprintf(stdout, ", value=%.*s>\n", it->value.size, it->value.data);
+        }
+        else
+        {
+            fprintf(stdout, ">\n");
+        }
     }
 }
 

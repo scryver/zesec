@@ -1,0 +1,5 @@
+extensions=".s.S.c.cpp.h.hpp.sh";
+open_recursively=true;
+
+fkey_command_linux[9]  = {"./build.sh", "*compilation*", false, true};
+fkey_command_linux[8]  = {"./build.sh", "*compilation*", true, true};
