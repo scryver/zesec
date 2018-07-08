@@ -94,7 +94,7 @@ tokenize(char *filename)
         {
             if (prevToken)
             {
-                prevToken->next_token = token;
+                prevToken->nextToken = token;
             }
             prevToken = token;
         }
@@ -149,7 +149,7 @@ print_token_kind(Token *token)
 internal void
 print_tokens(Token *tokens)
 {
-    for (Token *it = tokens; it; it = it->next_token)
+    for (Token *it = tokens; it; it = it->nextToken)
     {
         fprintf(stdout, "<");
         print_token_kind(it);

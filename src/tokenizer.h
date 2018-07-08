@@ -16,7 +16,7 @@ typedef struct Token
     TokenKind kind;
     String    value;
 
-    struct Token *next_token;
+    struct Token *nextToken;
 } Token;
 
 #define MAX_TOKEN_MEM_CHUNK 2048
