@@ -1,6 +1,5 @@
 #include "./common.h"
 
-
 typedef enum TokenKind
 {
     TOKEN_NULL,
@@ -42,7 +41,6 @@ read_entire_file(char *filename)
 
     return result;
 }
-
 
 #define MAX_TOKEN_MEM_CHUNK 2048
 internal inline Token *
@@ -210,11 +208,11 @@ print_tokens(Token *tokens)
         print_token_kind(it);
         if (it->kind == TOKEN_EOL)
         {
-            fprintf(stdout, ", '\\n'>\n");
+            fprintf(stdout, ",\\n>\n");
         }
         else if (it->value.size)
         {
-            fprintf(stdout, ", '%.*s'>\n", it->value.size, it->value.data);
+            fprintf(stdout, ",%.*s>\n", it->value.size, it->value.data);
         }
         else
         {
