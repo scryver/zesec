@@ -119,10 +119,8 @@ parse_statement(Token **at, Statement *statement)
 }
 
 internal Program *
-parse(char *filename)
+parse(Token *tokens)
 {
-    Token *tokens = tokenize(filename);
-
     Program *program = allocate_struct(Program, 0);
 
     Token *at = tokens;

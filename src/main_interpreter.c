@@ -1,10 +1,12 @@
 #include "./common.h"
 #include "./tokenizer.h"
 #include "./parser.h"
+// #include "./interpreter.h"
 
 #include "./common.c"
 #include "./tokenizer.c"
 #include "./parser.c"
+#include "./interpreter.c"
 
 int main(int argc, char **argv)
 {
@@ -17,7 +19,7 @@ int main(int argc, char **argv)
         Token *tokens = tokenize(argv[1]);
         Program *program = parse(tokens);
 
-        print_parsed_program(program);
+        interpret(program);
     }
     else
     {

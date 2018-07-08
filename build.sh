@@ -13,6 +13,7 @@ pushd "$buildDir" > /dev/null
 
 clang $flags $exceptions "$codeDir/main_tokenizer.c" -o tokenizer
 clang $flags $exceptions "$codeDir/main_parser.c" -o parser
+clang $flags $exceptions "$codeDir/main_interpreter.c" -o interpreter
 
 popd > /dev/null
 
