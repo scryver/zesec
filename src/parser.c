@@ -1,70 +1,6 @@
-
-typedef struct Constant
-{
-    int value;
-} Constant;
-
-typedef struct Identifier
-{
-    String name;
-} Identifier;
-
-typedef enum VariableKind
-{
-    VARIABLE_NULL,
-    VARIABLE_IDENTIFIER,
-    VARIABLE_CONSTANT,
-} VariableKind;
-typedef struct Variable
-{
-    VariableKind kind;
-    union
-    {
-        Constant *constant;
-        Identifier *id;
-    };
-} Variable;
-
-typedef enum ExpressionKind
-{
-    EXPRESSION_NULL,
-    EXPRESSION_ADD,
-    EXPRESSION_SUB,
-} ExpressionKind;
-typedef struct Expression
-{
-    ExpressionKind kind;
-    Variable *left;
-    struct Expression *right;
-} Expression;
-
-typedef struct Assignment
-{
-    Identifier *id;
-    Expression *expr;
-} Assignment;
-
-typedef enum StatementKind
-{
-    STATEMENT_ASSIGN,
-    STATEMENT_EXPR,
-} StatementKind;
-typedef struct Statement
-{
-    StatementKind kind;
-    union
-    {
-        Assignment *assign;
-        Expression *expr;
-    };
-} Statement;
-
-#define MAX_NR_STATEMENTS 1024
-typedef struct Program
-{
-    u32 nrStatements;
-    Statement statements[MAX_NR_STATEMENTS];
-} Program;
+#define MAX_IDENTIFIERS 1024
+global Identifier *gIdentifiers[MAX_IDENTIFIERS];
+global u32 gIdentifierCount;
 
 internal int
 parse_number(String s)
@@ -92,9 +28,26 @@ internal Identifier *
 parse_identifier(Token **at)
 {
     i_expect((*at)->kind == TOKEN_ID);
-    Identifier *result = allocate_struct(Identifier, 0);
-    result->name = (*at)->value;
-    *at = (*at)->nextToken;
+    Identifier *result = 0;
+    // NOTE(michiel): Check if we already got this identifier
+    for (u32 idIndex = 0; idIndex < gIdentifierCount; ++idIndex)
+    {
+        Identifier *ident = gIdentifiers[idIndex];
+        if ((ident->name.size == (*at)->value.size) &&
+            (ident->name.data == (*at)->value.data))
+        {
+            result = ident;
+            break;
+        }
+    }
+
+    if (!result)
+    {
+        i_expect(gIdentifierCount < MAX_IDENTIFIERS);
+        result = gIdentifiers[gIdentifierCount++] = allocate_struct(Identifier, 0);
+        result->name = (*at)->value;
+        *at = (*at)->nextToken;
+    }
     return result;
 }
 

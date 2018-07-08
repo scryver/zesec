@@ -1,6 +1,6 @@
 #include "./common.h"
 #include "./tokenizer.h"
-//#include "./parser.h"
+#include "./parser.h"
 
 #include "./common.c"
 #include "./tokenizer.c"
