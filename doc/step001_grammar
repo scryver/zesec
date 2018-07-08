@@ -1,0 +1,42 @@
+All values shall be signed integers with a storage size of 32 bits (4 bytes)
+
+Top level is always a program, we can add and subtract integers in this very basic program.
+The syntax used in these documents are based on standard language description and some simple
+regex statements, everything between ' is the used character in the language, for example '=' is
+used as the assign statement. Note that we add a variable and a identifier so we cannot assign to
+constant values with the assign statement.
+
+Regex examples:
+    ((X)* => Zero or more X)
+    (X|Y => Either X or Y)
+
+
+Constants:
+    NUMBER  : 32 bit signed constant number
+    ID      : Name of variable, by which it can be referenced
+    ADD_OP  : Add/Sub
+    END_OP  : Newline/SemiColon
+
+
+
+
+program:
+    statement (END_OP statement)*
+
+statement:
+    assign|expr
+
+assign:
+    identifier '=' expr
+
+expr:
+    variable (ADD_OP variable)*
+
+variable:
+    identifier|const
+
+identifier:
+    ID
+
+const:
+    NUMBER

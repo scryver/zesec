@@ -1,0 +1,127 @@
+ID
+CONST_INTEGER
+CONST_FLOAT
+CONST_STRING
+TYPE                = 's32'|'f32'|'str'
+STRUCT              = 'struct'
+UNION               = 'union'
+ADD                 = '+'
+SUB                 = '-'
+MUL                 = '*'
+DIV                 = '/'
+OPEN_PAREN          = '('
+CLOSE_PAREN         = ')'
+OPEN_BRACE          = '{'
+CLOSE_BRACE         = '}'
+COMMA               = ','
+SEMI                = ';'
+COLON               = ':'
+DOT                 = '.'
+RETURNS             = '->'
+RETURN              = 'return'
+BREAK               = 'break'
+EOL                 = '\n'
+ASSIGN              = '='
+LINE_COMMENT        = '//'
+START_BLOCK_COMMENT = '/*'
+END_BLOCK_COMMENT   = '*/'
+PRINT               = 'print'
+INLINE              = 'inline'
+
+
+line_comment:
+    LINE_COMMENT .* EOL
+block_comment:
+    START_BLOCK_COMMENT .* END_BLOCK_COMMENT
+
+program:
+    statement_list
+
+statement_list:
+        scope (statement_list)*
+      | function (statement_list)*
+      | statement ((SEMI|EOL) statement_list)*
+      | aggregate
+
+scope:
+    (scope_function_def)?
+    OPEN_BRACE
+        statement_list
+    CLOSE_BRACE
+
+scope_call:
+    scope_function_call
+
+// function is a scope that returns something
+function:
+    scope_function_def RETURNS declare_types
+    OPEN_BRACE
+        RETURN expr (COMMA expr)* | statement_list RETURN expr (COMMA expr)*
+    CLOSE_BRACE
+
+function_call:
+    scope_function_call
+
+scope_function_def:
+    variable (OPEN_PAREN decl_params CLOSE_PAREN)?
+
+scope_function_call:
+    variable (OPEN_PAREN call_params CLOSE_PAREN)?
+
+aggregate:
+    (STRUCT|UNION) aggregate_name
+    OPEN_BRACE
+        (INLINE aggregate_name | declare)+
+    CLOSE_BRACE
+
+statement:
+    scope_call|declare|assign|print|expr|empty
+
+decl_params:
+    declare (COMMA declare)*
+
+call_params:
+    expr (COMMA expr)*
+
+declare_types:
+    type_spec (COMMA type_spec)*
+
+declare:
+    type_spec (variable|assign (COMMA variable|assign)*)?
+
+// (COMMA variable) ...? x32 x, y = 1, 2, z = 3 <= looks weird...?
+// (COMMA variable) ...? x32 (x, y) = (1, 2), z = 3 <= looks weird...?
+assign:
+    (variable|OPEN_PAREN variable (COMMA variable)* CLOSE_PAREN) ASSIGN expr
+
+print:
+    PRINT OPEN_PAREN print_params CLOSE_PAREN
+
+print_params:
+    CONST_STRING (COMMA expr)*
+
+empty:
+
+type_spec:
+    type | aggregate_name
+
+expr:
+    term ((ADD|SUB) term)*
+
+term:
+    factor ((MUL|DIV) factor)*
+
+factor:
+    (ADD|SUB)factor|const|OPEN_PAREN expr (COMMA expr)*CLOSE_PAREN|variable|function_call
+
+const:
+    CONST_INTEGER|CONST_FLOAT|CONST_STRING
+
+type:
+    TYPE
+
+aggregate_name:
+    ID
+
+variable:
+    ID (DOT variable)*

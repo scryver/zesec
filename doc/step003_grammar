@@ -1,0 +1,49 @@
+All values shall be signed integers with a storage size of 32 bits (4 bytes)
+
+Now we need to loop back to the base expr case so that we can support (a + b) * c for example.
+
+
+
+
+
+Regex examples:
+    ((X)* => Zero or more X)
+    (X|Y => Either X or Y)
+
+
+Constants:
+    NUMBER  : 32 bit signed constant number
+    ID      : Name of variable, by which it can be referenced
+    MUL_OP  : Multiply/Divide/And/Shift
+    ADD_OP  : Add/Sub/Or/Xor
+    END_OP  : Newline/SemiColon
+
+
+
+program:
+    statement (END_OP statement)*
+
+statement:
+    assign|expr
+
+assign:
+    identifier '=' expr
+
+expr:
+    term (ADD_OP term)*
+
+term:
+    factor (MUL_OP factor)*
+
+factor:
+    variable|('(' expr ')')
+
+variable:
+    identifier|const
+
+identifier:
+    ID
+
+const:
+    NUMBER
+
