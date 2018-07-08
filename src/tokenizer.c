@@ -4,6 +4,13 @@
 typedef enum TokenKind
 {
     TOKEN_NULL,
+    TOKEN_NUMBER,
+    TOKEN_ID,
+    TOKEN_ADD,
+    TOKEN_SUB,
+    TOKEN_ASSIGN,
+    TOKEN_SEMI,
+    TOKEN_EOL,
 
     NUM_TOKENS, // NOTE(michiel): Always at the end of the enum to indicate how many tokens we have.
 } TokenKind;
@@ -36,7 +43,15 @@ read_entire_file(char *filename)
     return result;
 }
 
+
 #define MAX_TOKEN_MEM_CHUNK 2048
+internal inline Token *
+next_token(Token *tokens, u32 index)
+{
+    i_expect(index < MAX_TOKEN_MEM_CHUNK);
+    return tokens + index;
+}
+
 internal Token *
 tokenize(char *filename)
 {
@@ -44,15 +59,101 @@ tokenize(char *filename)
     s32 memRemaining = (s32)MAX_TOKEN_MEM_CHUNK;
     unused(memRemaining);
     Token *result = allocate_array(MAX_TOKEN_MEM_CHUNK, Token, 0);
+    Token *prevToken = NULL;
+    u32 tokenIndex = 0;
 
     Buffer fileBuffer = read_entire_file(filename);
 
     char *scanner = (char *)fileBuffer.data;
     while (*scanner)
     {
-        ++scanner;
+        Token *token = NULL;
+        if ((scanner[0] == ' ') ||
+            (scanner[0] == '\r') ||
+            (scanner[0] == '\t'))
+        {
+            // NOTE(michiel): Skip these
+            ++scanner;
+        }
+        else if (scanner[0] == '\n')
+        {
+            token = next_token(result, tokenIndex++);
+            token->kind = TOKEN_EOL;
+            token->value.size = 1;
+            token->value.data = (u8 *)scanner++;
+        }
+        else if (scanner[0] == ';')
+        {
+            token = next_token(result, tokenIndex++);
+            token->kind = TOKEN_SEMI;
+            token->value.size = 1;
+            token->value.data = (u8 *)scanner++;
+        }
+        else if (scanner[0] == '=')
+        {
+            token = next_token(result, tokenIndex++);
+            token->kind = TOKEN_ASSIGN;
+            token->value.size = 1;
+            token->value.data = (u8 *)scanner++;
+        }
+        else if (scanner[0] == '+')
+        {
+            token = next_token(result, tokenIndex++);
+            token->kind = TOKEN_ADD;
+            token->value.size = 1;
+            token->value.data = (u8 *)scanner++;
+        }
+        else if (scanner[0] == '-')
+        {
+            token = next_token(result, tokenIndex++);
+            token->kind = TOKEN_SUB;
+            token->value.size = 1;
+            token->value.data = (u8 *)scanner++;
+        }
+        else if (('0' <= scanner[0]) && (scanner[0] <= '9'))
+        {
+            token = next_token(result, tokenIndex++);
+            token->kind = TOKEN_NUMBER;
+            token->value.size = 1;
+            token->value.data = (u8 *)scanner++;
+            while (('0' <= scanner[0]) && (scanner[0] <= '9'))
+            {
+                ++token->value.size;
+                ++scanner;
+            }
+        }
+        else if ((scanner[0] == '_') ||
+                 (('A' <= scanner[0]) && (scanner[0] <= 'Z')) ||
+                 (('a' <= scanner[0]) && (scanner[0] <= 'z')))
+        {
+            token = next_token(result, tokenIndex++);
+            token->kind = TOKEN_ID;
+            token->value.size = 1;
+            token->value.data = (u8 *)scanner++;
+            while ((scanner[0] == '_') ||
+                   (('A' <= scanner[0]) && (scanner[0] <= 'Z')) ||
+                   (('a' <= scanner[0]) && (scanner[0] <= 'z')) ||
+                   (('0' <= scanner[0]) && (scanner[0] <= '9')))
+            {
+                ++token->value.size;
+                ++scanner;
+            }
+        }
+        else
+        {
+            fprintf(stderr, "Unhandled scan item: %c\n", scanner[0]);
+            ++scanner;
+        }
+
+        if (token)
+        {
+            if (prevToken)
+            {
+                prevToken->next_token = token;
+            }
+            prevToken = token;
+        }
     }
-    deallocate(fileBuffer.data);
 
     return result;
 }
@@ -63,7 +164,35 @@ print_token_kind(Token *token)
     switch (token->kind)
     {
         case TOKEN_NULL: {
-            fprintf(stdout, "null");
+            fprintf(stdout, "NULL");
+        } break;
+
+        case TOKEN_NUMBER: {
+            fprintf(stdout, "NUMBER");
+        } break;
+
+        case TOKEN_ID: {
+            fprintf(stdout, "ID");
+        } break;
+
+        case TOKEN_ADD: {
+            fprintf(stdout, "ADD");
+        } break;
+
+        case TOKEN_SUB: {
+            fprintf(stdout, "SUB");
+        } break;
+
+        case TOKEN_ASSIGN: {
+            fprintf(stdout, "ASSIGN");
+        } break;
+
+        case TOKEN_SEMI: {
+            fprintf(stdout, "SEMI");
+        } break;
+
+        case TOKEN_EOL: {
+            fprintf(stdout, "EOL");
         } break;
 
         default: {
@@ -79,9 +208,13 @@ print_tokens(Token *tokens)
     {
         fprintf(stdout, "<Token kind=");
         print_token_kind(it);
-        if (it->value.size)
+        if (it->kind == TOKEN_EOL)
         {
-            fprintf(stdout, ", value=%.*s>\n", it->value.size, it->value.data);
+            fprintf(stdout, ", value='\\n'>\n");
+        }
+        else if (it->value.size)
+        {
+            fprintf(stdout, ", value='%.*s'>\n", it->value.size, it->value.data);
         }
         else
         {
