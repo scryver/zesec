@@ -206,15 +206,15 @@ print_tokens(Token *tokens)
 {
     for (Token *it = tokens; it; it = it->next_token)
     {
-        fprintf(stdout, "<Token kind=");
+        fprintf(stdout, "<");
         print_token_kind(it);
         if (it->kind == TOKEN_EOL)
         {
-            fprintf(stdout, ", value='\\n'>\n");
+            fprintf(stdout, ", '\\n'>\n");
         }
         else if (it->value.size)
         {
-            fprintf(stdout, ", value='%.*s'>\n", it->value.size, it->value.data);
+            fprintf(stdout, ", '%.*s'>\n", it->value.size, it->value.data);
         }
         else
         {
