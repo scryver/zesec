@@ -30,7 +30,7 @@ assign:
     identifier '=' expr
 
 expr:
-    variable (ADD_OP variable)*
+    variable (ADD_OP expr)
 
 variable:
     identifier|const

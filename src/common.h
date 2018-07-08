@@ -9,6 +9,7 @@
 #define unused(x) (void)x
 
 #define i_expect  assert
+#define INVALID_DEFAULT_CASE default: { i_expect(0 && "Invalid default case"); } break
 
 #define U8_MAX    0xFF
 #define U16_MAX   0xFFFF
