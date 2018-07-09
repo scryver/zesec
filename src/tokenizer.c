@@ -6,7 +6,7 @@ advance(TokenEater *eater)
 }
 
 internal Token *
-tokenize(char *filename)
+tokenize(Buffer buffer, String filename)
 {
     // NOTE(michiel): Example of allocating token memory in chunks until we run out of chunks
     // TODO(michiel): Run out of chunks
@@ -14,9 +14,7 @@ tokenize(char *filename)
     Token *prevToken = NULL;
     u32 tokenIndex = 0;
 
-    Buffer fileBuffer = read_entire_file(filename);
-
-    TokenEater eater = {1, 1, (char *)fileBuffer.data};
+    TokenEater eater = {1, 1, (char *)buffer.data};
     while (*eater.scanner)
     {
         Token *token = NULL;
@@ -204,7 +202,7 @@ tokenize(char *filename)
         if (token)
         {
             token->lineNumber = eater.lineNumber;
-            token->filename = (String){.size=string_length(filename), .data=(u8 *)filename};
+            token->filename = filename;
             if (token->kind == TOKEN_EOL)
             {
                 ++eater.lineNumber;
@@ -219,7 +217,36 @@ tokenize(char *filename)
         }
     }
 
+    if ((prevToken->kind != TOKEN_EOL) &&
+        (prevToken->kind != TOKEN_SEMI))
+    {
+        fprintf(stderr, "The Tokenizer expects the token stream to end with a newline or semi-colon, but you're forgiven for now...\n");
+        Token *token = next_token(result, tokenIndex++);
+        token->kind = TOKEN_EOL;
+        token->value.size = 1;
+        token->value.data = (u8 *)"\n";
+        token->colNumber = 0;
+        token->lineNumber = eater.lineNumber;
+        token->filename = filename;
+        prevToken->nextToken = token;
+    }
+
     return result;
+}
+
+internal Token *
+tokenize_string(String tokenString)
+{
+    char *anonymous = "<anonymous>";
+    return tokenize(*(Buffer *)&tokenString,
+                    (String){.size=string_length(anonymous), .data=(u8 *)anonymous});
+}
+
+internal Token *
+tokenize_file(char *filename)
+{
+    Buffer fileBuffer = read_entire_file(filename);
+    return tokenize(fileBuffer, (String){.size=string_length(filename),.data=(u8 *)filename});
 }
 
 #define CASE(name) case TOKEN_##name: { fprintf(fileStream.file, #name); } break

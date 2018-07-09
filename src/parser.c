@@ -88,7 +88,7 @@ dust_off_expression(Expression *expr)
         while ((expr->op == EXPR_OP_NOP) &&
                (expr->leftKind == EXPRESSION_EXPR))
         {
-            //i_expect(expr->rightKind == EXPRESSION_VAR);
+            i_expect(expr->rightKind == EXPRESSION_NULL);
             i_expect(expr->rightExpr == 0);
             Expression *remove = expr;
             expr = expr->leftExpr;

@@ -12,7 +12,7 @@ int main(int argc, char **argv)
     {
         fprintf(stdout, "Tokenizing file: %s\n", argv[1]);
 
-        Token *tokens = tokenize(argv[1]);
+        Token *tokens = tokenize_file(argv[1]);
         print_tokens(tokens);
     }
     else
