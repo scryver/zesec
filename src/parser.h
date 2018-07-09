@@ -1,4 +1,3 @@
-
 typedef struct Constant
 {
     int value;

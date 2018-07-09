@@ -34,6 +34,8 @@ typedef int64_t   b64;
 typedef float     f32;
 typedef double    f64;
 
+typedef size_t    uptr;
+
 typedef struct Buffer
 {
     u32 size;

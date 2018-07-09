@@ -33,11 +33,23 @@ parse_identifier(Token **at)
     for (u32 idIndex = 0; idIndex < gIdentifierCount; ++idIndex)
     {
         Identifier *ident = gIdentifiers[idIndex];
-        if ((ident->name.size == (*at)->value.size) &&
-            (ident->name.data == (*at)->value.data))
+        if (ident->name.size == (*at)->value.size)
         {
             result = ident;
-            break;
+            for (u32 nameIndex = 0; nameIndex < ident->name.size; ++nameIndex)
+            {
+                if (ident->name.data[nameIndex] != (*at)->value.data[nameIndex])
+                {
+                    result = 0;
+                    break;
+                }
+            }
+
+            if (result)
+            {
+                *at = (*at)->nextToken;
+                break;
+            }
         }
     }
 
