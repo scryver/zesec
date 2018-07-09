@@ -18,3 +18,24 @@ read_entire_file(char *filename)
 
     return result;
 }
+
+internal b32
+strings_are_equal(String a, String b)
+{
+    b32 result = false;
+
+    if (a.size == b.size)
+    {
+        result = true;
+        for (u32 nameIndex = 0; nameIndex < a.size; ++nameIndex)
+        {
+            if (a.data[nameIndex] != b.data[nameIndex])
+            {
+                result = false;
+                break;
+            }
+        }
+    }
+
+    return result;
+}

@@ -11,16 +11,12 @@ global u32 gSymbolCount;
 internal Symbol *
 get_symbol(Identifier *id)
 {
-    fprintf(stdout, "ID: %.*s\n", id->name.size, (char *)id->name.data);
     Symbol *result = NULL;
     for (u32 symbolIndex = 0;
          symbolIndex < gSymbolCount;
          ++symbolIndex)
     {
         Symbol *symbol = gSymbols + symbolIndex;
-        fprintf(stdout, "Symbol: %.*s\n", symbol->name.size, (char *)symbol->name.data);
-        fprintf(stdout, "(Size: %u, expected: %u) (Data: %lu, expected: %lu)\n",
-                symbol->name.size, id->name.size, (uptr)symbol->name.data, (uptr)id->name.data);
         if ((symbol->name.size == id->name.size) &&
             (symbol->name.data == id->name.data))
         {

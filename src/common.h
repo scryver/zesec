@@ -8,6 +8,9 @@
 #define persist   static
 #define unused(x) (void)x
 
+#define false     0
+#define true      1
+
 #define i_expect  assert
 #define INVALID_DEFAULT_CASE default: { i_expect(0 && "Invalid default case"); } break
 
