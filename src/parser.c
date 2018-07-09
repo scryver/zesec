@@ -62,6 +62,7 @@ parse_variable(Token **at)
     }
     else
     {
+        i_expect((*at)->kind == TOKEN_ID);
         result->kind = VARIABLE_IDENTIFIER;
         result->id = parse_identifier(at);
     }
@@ -69,25 +70,71 @@ parse_variable(Token **at)
 }
 
 internal Expression *
-parse_expression(Token **at)
+parse_expression(Token **at, Expression *leftExpr)
 {
     Expression *result = allocate_struct(Expression, 0);
-    result->left = parse_variable(at);
-    if ((*at)->kind == TOKEN_ADD)
+    b32 done = false;
+    result->op = EXPR_OP_NOP;
+    if (!leftExpr)
     {
-        result->kind = EXPRESSION_ADD;
-        *at = (*at)->nextToken;
-        result->right = parse_expression(at);
+        result->left = parse_variable(at);
+        result->leftKind = EXPRESSION_VAR;
     }
-    else if ((*at)->kind == TOKEN_SUB)
+
+    if ((*at)->kind == TOKEN_SUB)
     {
-        result->kind = EXPRESSION_SUB;
+        result->op = EXPR_OP_SUB;
         *at = (*at)->nextToken;
-        result->right = parse_expression(at);
+        result->right = parse_variable(at);
+        result->rightKind = EXPRESSION_VAR;
+
+        if (leftExpr)
+        {
+            assert(leftExpr->op != EXPR_OP_NOP);
+            result->leftExpr = leftExpr;
+            result->leftKind = EXPRESSION_EXPR;
+        }
+    }
+    else if ((*at)->kind == TOKEN_ADD)
+    {
+        result->op = EXPR_OP_ADD;
+        *at = (*at)->nextToken;
+        result->right = parse_variable(at);
+        result->rightKind = EXPRESSION_VAR;
+
+        if (leftExpr)
+        {
+            if (leftExpr->op == EXPR_OP_SUB)
+            {
+                result->leftExpr = leftExpr;
+                result->leftKind = EXPRESSION_EXPR;
+            }
+            else
+            {
+                assert(leftExpr->op == EXPR_OP_ADD);
+                result->left = leftExpr->right;
+                result->leftKind = leftExpr->rightKind;
+                leftExpr->rightExpr = result;
+                leftExpr->rightKind = EXPRESSION_EXPR;
+                result = leftExpr;
+            }
+        }
     }
     else
     {
-        result->kind = EXPRESSION_NULL;
+        if (leftExpr)
+        {
+            deallocate(result);
+            result = leftExpr;
+        }
+        done = true;
+    }
+
+    if (!done &&
+        ((result->op == EXPR_OP_ADD) ||
+         (result->op == EXPR_OP_SUB)))
+    {
+        result = parse_expression(at, result);
     }
     return result;
 }
@@ -99,7 +146,7 @@ parse_assignment(Token **at)
     result->id = parse_identifier(at);
     i_expect((*at)->kind == TOKEN_ASSIGN);
     *at = (*at)->nextToken;
-    result->expr = parse_expression(at);
+    result->expr = parse_expression(at, 0);
     return result;
 }
 
@@ -114,7 +161,7 @@ parse_statement(Token **at, Statement *statement)
     else
     {
         statement->kind = STATEMENT_EXPR;
-        statement->expr = parse_expression(at);
+        statement->expr = parse_expression(at, 0);
     }
 }
 
@@ -179,21 +226,47 @@ print_variable(Variable *var)
 internal void
 print_expression(Expression *expr)
 {
-    switch (expr->kind)
+    switch (expr->op)
     {
-        case EXPRESSION_NULL:
+        case EXPR_OP_NOP:
         {
-            print_variable(expr->left);
-            // NOTE(michiel): Do nothing
+            if (expr->leftKind == EXPRESSION_VAR)
+            {
+                print_variable(expr->left);
+            }
+            else
+            {
+                i_expect(expr->leftKind == EXPRESSION_EXPR);
+                print_expression(expr->leftExpr);
+            }
         } break;
 
-        case EXPRESSION_ADD:
-        case EXPRESSION_SUB:
+        case EXPR_OP_ADD:
+        case EXPR_OP_SUB:
         {
-            fprintf(stdout, "(%s ", expr->kind == EXPRESSION_ADD ? "add" : "sub");
-            print_variable(expr->left);
+            fprintf(stdout, "(%s ", expr->op == EXPR_OP_ADD ? "add" : "sub");
+
+            if (expr->leftKind == EXPRESSION_VAR)
+            {
+                print_variable(expr->left);
+            }
+            else
+            {
+                i_expect(expr->leftKind == EXPRESSION_EXPR);
+                print_expression(expr->leftExpr);
+            }
+
             fprintf(stdout, " ");
-            print_expression(expr->right);
+
+            if (expr->rightKind == EXPRESSION_VAR)
+            {
+                print_variable(expr->right);
+            }
+            else
+            {
+                i_expect(expr->rightKind == EXPRESSION_EXPR);
+                print_expression(expr->rightExpr);
+            }
             fprintf(stdout, ")");
         } break;
 

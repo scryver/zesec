@@ -24,17 +24,32 @@ typedef struct Variable
     };
 } Variable;
 
+typedef enum ExpressionOp
+{
+    EXPR_OP_NOP,
+    EXPR_OP_ADD,
+    EXPR_OP_SUB,
+} ExpressionOp;
 typedef enum ExpressionKind
 {
-    EXPRESSION_NULL,
-    EXPRESSION_ADD,
-    EXPRESSION_SUB,
+    EXPRESSION_VAR,
+    EXPRESSION_EXPR,
 } ExpressionKind;
 typedef struct Expression
 {
-    ExpressionKind kind;
-    Variable *left;
-    struct Expression *right;
+    ExpressionOp op;
+
+    ExpressionKind leftKind;
+    union {
+        Variable *left;
+        struct Expression *leftExpr;
+    };
+
+    ExpressionKind rightKind;
+    union {
+        Variable *right;
+        struct Expression *rightExpr;
+    };
 } Expression;
 
 typedef struct Assignment

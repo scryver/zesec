@@ -69,28 +69,56 @@ get_variable_value(Variable *variable)
 internal int
 interpret_expression(Expression *expr)
 {
-    i_expect((expr->kind == EXPRESSION_NULL) ||
-             (expr->kind == EXPRESSION_ADD) ||
-             (expr->kind == EXPRESSION_SUB));
+    i_expect((expr->op == EXPR_OP_NOP) ||
+             (expr->op == EXPR_OP_ADD) ||
+             (expr->op == EXPR_OP_SUB));
 
-    int result = get_variable_value(expr->left);
+    int result = 0;
+    int left = 0;
+    int right = 0;
 
-    do
+    if (expr->leftKind == EXPRESSION_VAR)
     {
-        if (expr->kind == EXPRESSION_ADD)
-        {
-            int right = get_variable_value(expr->right->left);
-            result += right;
-        }
-        else if (expr->kind == EXPRESSION_SUB)
-        {
-            int right = get_variable_value(expr->right->left);
-            result -= right;
-        }
-        expr = expr->right;
+        left = get_variable_value(expr->left);
     }
-    while (expr && ((expr->kind == EXPRESSION_ADD) ||
-                    (expr->kind == EXPRESSION_SUB)));
+    else
+    {
+        i_expect(expr->leftKind == EXPRESSION_EXPR);
+        left = interpret_expression(expr->leftExpr);
+    }
+
+    if (expr->op != EXPR_OP_NOP)
+    {
+        if (expr->rightKind == EXPRESSION_VAR)
+        {
+            right = get_variable_value(expr->right);
+        }
+        else
+        {
+            i_expect(expr->rightKind == EXPRESSION_EXPR);
+            right = interpret_expression(expr->rightExpr);
+        }
+    }
+
+    switch (expr->op)
+    {
+        case EXPR_OP_NOP:
+        {
+            result = left;
+        } break;
+
+        case EXPR_OP_ADD:
+        {
+            result = left + right;
+        } break;
+
+        case EXPR_OP_SUB:
+        {
+            result = left - right;
+        } break;
+
+        INVALID_DEFAULT_CASE;
+    }
 
     return result;
 }

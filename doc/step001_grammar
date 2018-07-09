@@ -14,7 +14,7 @@ Regex examples:
 Constants:
     NUMBER  : 32 bit signed constant number
     ID      : Name of variable, by which it can be referenced
-    ADD_OP  : Add/Sub
+    ADD_OP  : Sub/Add
     END_OP  : Newline/SemiColon
 
 
@@ -30,7 +30,7 @@ assign:
     identifier '=' expr
 
 expr:
-    variable (ADD_OP expr)
+    variable (ADD_OP variable)*
 
 variable:
     identifier|const
