@@ -19,6 +19,26 @@ read_entire_file(char *filename)
     return result;
 }
 
+internal u32
+string_length(char *cString)
+{
+    u32 length = 0;
+    while (*cString++)
+    {
+        ++length;
+    }
+    return length;
+}
+
+internal inline String
+create_string(char *cString)
+{
+    String result = {0};
+    result.size = string_length(cString);
+    result.data = (u8 *)cString;
+    return result;
+}
+
 internal b32
 strings_are_equal(String a, String b)
 {
@@ -39,3 +59,4 @@ strings_are_equal(String a, String b)
 
     return result;
 }
+

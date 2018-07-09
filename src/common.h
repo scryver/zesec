@@ -46,6 +46,12 @@ typedef struct Buffer
 } Buffer;
 typedef Buffer String;
 
+// TODO(michiel): Own struct for this
+typedef struct FileStream
+{
+    FILE *file;
+} FileStream;
+
 typedef enum AllocateFlags
 {
     ALLOC_NOCLEAR = 0x01,  // NOTE(michiel): This is a NO so a flag value of 0 clears the memory by default

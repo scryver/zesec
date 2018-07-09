@@ -66,40 +66,77 @@ get_variable_value(Variable *variable)
     return result;
 }
 
+#define BINOP(name, op) case EXPR_OP_##name: { result = left op right; } break;
+
 internal int
 interpret_expression(Expression *expr)
 {
-    i_expect((expr->kind == EXPRESSION_NULL) ||
-             (expr->kind == EXPRESSION_ADD) ||
-             (expr->kind == EXPRESSION_SUB));
+    i_expect((EXPR_OP_NOP <= expr->op) &&
+             (expr->op <= EXPR_OP_XOR));
 
-    int result = get_variable_value(expr->left);
+    int result = 0;
+    int left = 0;
+    int right = 0;
 
-    do
+    if (expr->leftKind == EXPRESSION_VAR)
     {
-        if (expr->kind == EXPRESSION_ADD)
-        {
-            int right = get_variable_value(expr->right->left);
-            result += right;
-        }
-        else if (expr->kind == EXPRESSION_SUB)
-        {
-            int right = get_variable_value(expr->right->left);
-            result -= right;
-        }
-        expr = expr->right;
+        left = get_variable_value(expr->left);
     }
-    while (expr && ((expr->kind == EXPRESSION_ADD) ||
-                    (expr->kind == EXPRESSION_SUB)));
+    else
+    {
+        i_expect(expr->leftKind == EXPRESSION_EXPR);
+        left = interpret_expression(expr->leftExpr);
+    }
+
+    if (expr->op != EXPR_OP_NOP)
+    {
+        if (expr->rightKind == EXPRESSION_VAR)
+        {
+            right = get_variable_value(expr->right);
+        }
+        else
+        {
+            i_expect(expr->rightKind == EXPRESSION_EXPR);
+            right = interpret_expression(expr->rightExpr);
+        }
+    }
+
+    switch (expr->op)
+    {
+        case EXPR_OP_NOP:
+        {
+            result = left;
+        } break;
+
+        BINOP(MUL, *);
+        BINOP(DIV, /);
+        BINOP(AND, &);
+        BINOP(SLL, <<);
+        case EXPR_OP_SRL:
+        {
+            result = ((u32)left) >> right;
+        } break;
+        BINOP(SRA, >>);
+        BINOP(SUB, -);
+        BINOP(ADD, +);
+        BINOP(OR, |);
+        BINOP(XOR, ^);
+
+        INVALID_DEFAULT_CASE;
+    }
 
     return result;
 }
 
-internal void
+#undef BINOP
+
+internal Symbol *
 interpret_assign(Assignment *assign)
 {
     Symbol *symbol = get_or_create_symbol(assign->id);
     symbol->value = interpret_expression(assign->expr);
+
+    return symbol;
 }
 
 internal void
@@ -146,6 +183,4 @@ interpret(Program *program)
         Statement *statement = program->statements + statementIndex;
         interpret_statement(statement);
     }
-
-    print_interpretation();
 }

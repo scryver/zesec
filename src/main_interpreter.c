@@ -16,10 +16,12 @@ int main(int argc, char **argv)
     {
         fprintf(stdout, "Parsing file: %s\n", argv[1]);
 
-        Token *tokens = tokenize(argv[1]);
+        Token *tokens = tokenize_file(argv[1]);
         Program *program = parse(tokens);
 
         interpret(program);
+
+        print_interpretation();
     }
     else
     {

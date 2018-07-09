@@ -2,7 +2,7 @@ All values shall be signed integers with a storage size of 32 bits (4 bytes)
 
 We extend our program with logical operators and a new level of operators
 Notice that precedence is denotated by the operator level followed by the
-argument list after the ':', for example Multiply or Xor.
+argument list after the ':', for example Multiply before And, or Or before Xor.
 
 
 
@@ -15,7 +15,7 @@ Constants:
     NUMBER  : 32 bit signed constant number
     ID      : Name of variable, by which it can be referenced
     MUL_OP  : Multiply/Divide/And/Shift
-    ADD_OP  : Add/Sub/Or/Xor
+    ADD_OP  : Sub/Add/Or/Xor
     END_OP  : Newline/SemiColon
 
 
