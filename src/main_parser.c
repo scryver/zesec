@@ -17,7 +17,7 @@ int main(int argc, char **argv)
         Token *tokens = tokenize(argv[1]);
         Program *program = parse(tokens);
 
-        print_parsed_program(program);
+        print_parsed_program(program, false);
     }
     else
     {

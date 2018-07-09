@@ -79,9 +79,34 @@ parse_variable(Token **at)
     return result;
 }
 
+// TODO(michiel): Clean up handling, so this isn't needed to get rid of empty results
+internal inline Expression *
+dust_off_expression(Expression *expr)
+{
+    if (expr)
+    {
+        while ((expr->op == EXPR_OP_NOP) &&
+               (expr->leftKind == EXPRESSION_EXPR))
+        {
+            //i_expect(expr->rightKind == EXPRESSION_VAR);
+            i_expect(expr->rightExpr == 0);
+            Expression *remove = expr;
+            expr = expr->leftExpr;
+            deallocate(remove);
+        }
+    }
+
+    return expr;
+}
+
 internal inline Expression *
 new_op_has_precedence(Expression *newOp, Expression *oldOp)
 {
+    while ((oldOp->rightKind == EXPRESSION_EXPR) &&
+           (oldOp->rightExpr->op > newOp->op))
+    {
+        oldOp = oldOp->rightExpr;
+    }
     newOp->left = oldOp->right;
     newOp->leftKind = oldOp->rightKind;
     i_expect(newOp->rightKind == EXPRESSION_VAR);
@@ -106,6 +131,9 @@ parse_expression_precedence(Token **at, Expression *curExpr, Expression *leftExp
     *at = (*at)->nextToken;
     result->right = parse_variable(at);
     result->rightKind = EXPRESSION_VAR;
+
+    result = dust_off_expression(result);
+    leftExpr = dust_off_expression(leftExpr);
 
     if (leftExpr)
     {
@@ -136,11 +164,6 @@ parse_expression_mul_op(Token **at, Expression *leftExpr)
         result->left = parse_variable(at);
         result->leftKind = EXPRESSION_VAR;
     }
-    else
-    {
-        result->leftExpr = leftExpr;
-        result->leftKind = EXPRESSION_EXPR;
-    }
 
     switch ((*at)->kind)
     {
@@ -154,7 +177,7 @@ parse_expression_mul_op(Token **at, Expression *leftExpr)
         {
             if (leftExpr)
             {
-                *result = *leftExpr;
+                result = leftExpr;
             }
             done = true;
         } break;
@@ -165,6 +188,7 @@ parse_expression_mul_op(Token **at, Expression *leftExpr)
     {
         result = parse_expression_mul_op(at, result);
     }
+
     return result;
 }
 
@@ -215,6 +239,7 @@ parse_expression_add_op(Token **at, Expression *leftExpr)
     {
         result = parse_expression_add_op(at, result);
     }
+
     return result;
 }
 
@@ -281,20 +306,34 @@ parse(Token *tokens)
 }
 
 internal void
-print_constant(Constant *constant)
+print_constant(Constant *constant, b32 verbose)
 {
-    fprintf(stdout, "%d", constant->value);
+    char *format = "%d";
+    if (verbose)
+    {
+        format = "(const %d)";
+    }
+    fprintf(stdout, format, constant->value);
 }
 
 internal void
-print_identifier(Identifier *id)
+print_identifier(Identifier *id, b32 verbose)
 {
-    fprintf(stdout, "'%.*s'", id->name.size, (char *)id->name.data);
+    char *format = "'%.*s'";
+    if (verbose)
+    {
+        format = "(id '%.*s')";
+    }
+    fprintf(stdout, format, id->name.size, (char *)id->name.data);
 }
 
 internal void
-print_variable(Variable *var)
+print_variable(Variable *var, b32 verbose)
 {
+    if (verbose)
+    {
+        fprintf(stdout, "(var ");
+    }
     if (!var)
     {
         fprintf(stdout, "EMPTY_VAR");
@@ -310,64 +349,75 @@ print_variable(Variable *var)
 
             case VARIABLE_IDENTIFIER:
             {
-                print_identifier(var->id);
+                print_identifier(var->id, verbose);
             } break;
 
             case VARIABLE_CONSTANT:
             {
-                print_constant(var->constant);
+                print_constant(var->constant, verbose);
             } break;
 
             INVALID_DEFAULT_CASE;
         }
     }
+    if (verbose)
+    {
+        fprintf(stdout, ")");
+    }
 }
 
 internal void
-print_expression_op(Expression *expr, char *opstr)
+print_expression_op(Expression *expr, char *opstr, b32 verbose)
 {
     fprintf(stdout, "(%s ", opstr);
     if (expr->leftKind == EXPRESSION_VAR)
     {
-        print_variable(expr->left);
+        print_variable(expr->left, verbose);
     }
     else
     {
         i_expect(expr->leftKind == EXPRESSION_EXPR);
-        print_expression(expr->leftExpr);
+        print_expression(expr->leftExpr, verbose);
     }
 
     fprintf(stdout, " ");
 
     if (expr->rightKind == EXPRESSION_VAR)
     {
-        print_variable(expr->right);
+        print_variable(expr->right, verbose);
     }
     else
     {
         i_expect(expr->rightKind == EXPRESSION_EXPR);
-        print_expression(expr->rightExpr);
+        print_expression(expr->rightExpr, verbose);
     }
     fprintf(stdout, ")");
 }
 
-#define CASE(name, printName) case EXPR_OP_##name: { print_expression_op(expr, #printName); } break
+#define CASE(name, printName) case EXPR_OP_##name: { print_expression_op(expr, #printName, verbose); } break
 
 internal void
-print_expression(Expression *expr)
+print_expression(Expression *expr, b32 verbose)
 {
+    if (verbose)
+    {
+        fprintf(stdout, "(expr ");
+    }
     switch (expr->op)
     {
         case EXPR_OP_NOP:
         {
             if (expr->leftKind == EXPRESSION_VAR)
             {
-                print_variable(expr->left);
+                print_variable(expr->left, verbose);
+            }
+            else if (expr->leftKind == EXPRESSION_EXPR)
+            {
+                print_expression(expr->leftExpr, verbose);
             }
             else
             {
-                i_expect(expr->leftKind == EXPRESSION_EXPR);
-                print_expression(expr->leftExpr);
+                fprintf(stdout, "EMPTY");
             }
         } break;
 
@@ -389,35 +439,58 @@ print_expression(Expression *expr)
 #undef CASE
 
 internal void
-print_assignment(Assignment *assign)
+print_assignment(Assignment *assign, b32 verbose)
 {
     fprintf(stdout, "(assign ");
-    print_identifier(assign->id);
+    print_identifier(assign->id, verbose);
     fprintf(stdout, " ");
-    print_expression(assign->expr);
+    print_expression(assign->expr, verbose);
     fprintf(stdout, ")");
 }
 
 internal void
-print_statement(Statement *statement)
+print_statement(Statement *statement, b32 verbose)
 {
+    if (verbose)
+    {
+        fprintf(stdout, "(stmt ");
+    }
     switch (statement->kind)
     {
-        case STATEMENT_ASSIGN: print_assignment(statement->assign); break;
-        case STATEMENT_EXPR:   print_expression(statement->expr); break;
+        case STATEMENT_ASSIGN: print_assignment(statement->assign, verbose); break;
+        case STATEMENT_EXPR:   print_expression(statement->expr, verbose); break;
         INVALID_DEFAULT_CASE;
+    }
+    if (verbose)
+    {
+        fprintf(stdout, ")");
     }
 }
 
 internal void
-print_parsed_program(Program *program)
+print_parsed_program(Program *program, b32 verbose)
 {
+    if (verbose)
+    {
+        fprintf(stdout, "(program \n  ");
+    }
     for (u32 statementIndex = 0;
          statementIndex < program->nrStatements;
          ++statementIndex)
     {
         Statement *statement = program->statements + statementIndex;
-        print_statement(statement);
+        print_statement(statement, verbose);
+        if (statementIndex < (program->nrStatements - 1))
+        {
+            fprintf(stdout, "\n%s", verbose ? "  " : "");
+        }
+    }
+    if (verbose)
+    {
+        fprintf(stdout, ")\n");
+    }
+    else
+    {
         fprintf(stdout, "\n");
     }
 }

@@ -40,6 +40,7 @@ typedef enum ExpressionOp
 } ExpressionOp;
 typedef enum ExpressionKind
 {
+    EXPRESSION_NULL,
     EXPRESSION_VAR,
     EXPRESSION_EXPR,
 } ExpressionKind;
@@ -88,7 +89,7 @@ typedef struct Program
     Statement statements[MAX_NR_STATEMENTS];
 } Program;
 
-internal void print_constant(Constant *constant);
-internal void print_identifier(Identifier *id);
-internal void print_variable(Variable *var);
-internal void print_expression(Expression *expr);
+internal void print_constant(Constant *constant, b32 verbose);
+internal void print_identifier(Identifier *id, b32 verbose);
+internal void print_variable(Variable *var, b32 verbose);
+internal void print_expression(Expression *expr, b32 verbose);
