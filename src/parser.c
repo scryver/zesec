@@ -62,81 +62,168 @@ parse_variable(Token **at)
     }
     else
     {
-        i_expect((*at)->kind == TOKEN_ID);
-        result->kind = VARIABLE_IDENTIFIER;
-        result->id = parse_identifier(at);
+        if (!((*at)->kind == TOKEN_ID))
+        {
+            fprintf(stderr, "Unknown variable token: ");
+            print_token((FileStream){stderr}, *at);
+            fprintf(stderr, "\n");
+            deallocate(result);
+            result = 0;
+        }
+        else
+        {
+            result->kind = VARIABLE_IDENTIFIER;
+            result->id = parse_identifier(at);
+        }
     }
     return result;
 }
 
-internal Expression *
-parse_expression(Token **at, Expression *leftExpr)
+internal inline Expression *
+new_op_has_precedence(Expression *newOp, Expression *oldOp)
 {
-    Expression *result = allocate_struct(Expression, 0);
+    newOp->left = oldOp->right;
+    newOp->leftKind = oldOp->rightKind;
+    i_expect(newOp->rightKind == EXPRESSION_VAR);
+    oldOp->rightExpr = newOp;
+    oldOp->rightKind = EXPRESSION_EXPR;
+    return oldOp;
+}
+
+internal inline Expression *
+old_op_has_precedence(Expression *newOp, Expression *oldOp)
+{
+    newOp->leftExpr = oldOp;
+    newOp->leftKind = EXPRESSION_EXPR;
+    return newOp;
+}
+
+internal inline Expression *
+parse_expression_precedence(Token **at, Expression *curExpr, Expression *leftExpr, ExpressionOp op)
+{
+    Expression *result = curExpr;
+    result->op = op;
+    *at = (*at)->nextToken;
+    result->right = parse_variable(at);
+    result->rightKind = EXPRESSION_VAR;
+
+    if (leftExpr)
+    {
+        if (leftExpr->op <= result->op)
+        {
+            result = old_op_has_precedence(result, leftExpr);
+        }
+        else
+        {
+            i_expect(leftExpr->op != EXPR_OP_NOP);
+            result = new_op_has_precedence(result, leftExpr);
+        }
+    }
+
+    return result;
+}
+
+#define CASE(x) case TOKEN_##x: { result = parse_expression_precedence(at, result, leftExpr, EXPR_OP_##x); } break
+
+internal Expression *
+parse_expression_mul_op(Token **at, Expression *leftExpr)
+{
     b32 done = false;
+    Expression *result = allocate_struct(Expression, 0);
     result->op = EXPR_OP_NOP;
     if (!leftExpr)
     {
         result->left = parse_variable(at);
         result->leftKind = EXPRESSION_VAR;
     }
-
-    if ((*at)->kind == TOKEN_SUB)
+    else
     {
-        result->op = EXPR_OP_SUB;
-        *at = (*at)->nextToken;
-        result->right = parse_variable(at);
-        result->rightKind = EXPRESSION_VAR;
-
-        if (leftExpr)
-        {
-            assert(leftExpr->op != EXPR_OP_NOP);
-            result->leftExpr = leftExpr;
-            result->leftKind = EXPRESSION_EXPR;
-        }
+        result->leftExpr = leftExpr;
+        result->leftKind = EXPRESSION_EXPR;
     }
-    else if ((*at)->kind == TOKEN_ADD)
-    {
-        result->op = EXPR_OP_ADD;
-        *at = (*at)->nextToken;
-        result->right = parse_variable(at);
-        result->rightKind = EXPRESSION_VAR;
 
-        if (leftExpr)
+    switch ((*at)->kind)
+    {
+        CASE(MUL);
+        CASE(DIV);
+        CASE(AND);
+        CASE(SLL);
+        CASE(SRL);
+        CASE(SRA);
+        default:
         {
-            if (leftExpr->op == EXPR_OP_SUB)
+            if (leftExpr)
             {
-                result->leftExpr = leftExpr;
-                result->leftKind = EXPRESSION_EXPR;
+                *result = *leftExpr;
             }
-            else
-            {
-                assert(leftExpr->op == EXPR_OP_ADD);
-                result->left = leftExpr->right;
-                result->leftKind = leftExpr->rightKind;
-                leftExpr->rightExpr = result;
-                leftExpr->rightKind = EXPRESSION_EXPR;
-                result = leftExpr;
-            }
+            done = true;
+        } break;
+    }
+
+    if (!done &&
+        ((EXPR_OP_MUL <= result->op) && (result->op <= EXPR_OP_SRA)))
+    {
+        result = parse_expression_mul_op(at, result);
+    }
+    return result;
+}
+
+internal Expression *
+parse_expression_add_op(Token **at, Expression *leftExpr)
+{
+    Expression *result = allocate_struct(Expression, 0);
+    b32 done = false;
+    result->op = EXPR_OP_NOP;
+    if (!leftExpr)
+    {
+        result->leftExpr = parse_expression_mul_op(at, 0);
+        result->leftKind = EXPRESSION_EXPR;
+        if (result->leftExpr->op == EXPR_OP_NOP)
+        {
+            Expression *leftE = result->leftExpr;
+
+            result->left = leftE->left;
+            result->leftKind = EXPRESSION_VAR;
+            deallocate(leftE);
         }
     }
     else
     {
-        if (leftExpr)
+        result->leftExpr = leftExpr;
+        result->leftKind = EXPRESSION_EXPR;
+    }
+
+    switch ((*at)->kind)
+    {
+        CASE(SUB);
+        CASE(ADD);
+        CASE(OR);
+        CASE(XOR);
+        default:
         {
-            deallocate(result);
-            result = leftExpr;
-        }
-        done = true;
+            result = parse_expression_mul_op(at, result);
+            if (result->op == EXPR_OP_NOP)
+            {
+                done = true;
+            }
+        } break;
     }
 
     if (!done &&
-        ((result->op == EXPR_OP_ADD) ||
-         (result->op == EXPR_OP_SUB)))
+        (EXPR_OP_MUL <= result->op) &&
+        (result->op <= EXPR_OP_XOR))
     {
-        result = parse_expression(at, result);
+        result = parse_expression_add_op(at, result);
     }
     return result;
+}
+
+#undef CASE
+
+internal Expression *
+parse_expression(Token **at)
+{
+    return parse_expression_add_op(at, 0);
 }
 
 internal Assignment *
@@ -146,7 +233,7 @@ parse_assignment(Token **at)
     result->id = parse_identifier(at);
     i_expect((*at)->kind == TOKEN_ASSIGN);
     *at = (*at)->nextToken;
-    result->expr = parse_expression(at, 0);
+    result->expr = parse_expression(at);
     return result;
 }
 
@@ -161,7 +248,7 @@ parse_statement(Token **at, Statement *statement)
     else
     {
         statement->kind = STATEMENT_EXPR;
-        statement->expr = parse_expression(at, 0);
+        statement->expr = parse_expression(at);
     }
 }
 
@@ -178,6 +265,12 @@ parse(Token *tokens)
 
         do
         {
+            if (!((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI)))
+            {
+                fprintf(stderr, "Statement not closed by newline or semi-colon!\nStuck at: ");
+                print_token((FileStream){stderr}, at);
+                fprintf(stderr, "\n");
+            }
             i_expect((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI));
             at = at->nextToken;
         }
@@ -202,26 +295,63 @@ print_identifier(Identifier *id)
 internal void
 print_variable(Variable *var)
 {
-    switch (var->kind)
+    if (!var)
     {
-        case VARIABLE_NULL:
+        fprintf(stdout, "EMPTY_VAR");
+    }
+    else
+    {
+        switch (var->kind)
         {
-           // TODO(michiel): Error?
-        } break;
+            case VARIABLE_NULL:
+            {
+                // TODO(michiel): Error?
+            } break;
 
-        case VARIABLE_IDENTIFIER:
-        {
-            print_identifier(var->id);
-        } break;
+            case VARIABLE_IDENTIFIER:
+            {
+                print_identifier(var->id);
+            } break;
 
-        case VARIABLE_CONSTANT:
-        {
-            print_constant(var->constant);
-        } break;
+            case VARIABLE_CONSTANT:
+            {
+                print_constant(var->constant);
+            } break;
 
-        INVALID_DEFAULT_CASE;
+            INVALID_DEFAULT_CASE;
+        }
     }
 }
+
+internal void
+print_expression_op(Expression *expr, char *opstr)
+{
+    fprintf(stdout, "(%s ", opstr);
+    if (expr->leftKind == EXPRESSION_VAR)
+    {
+        print_variable(expr->left);
+    }
+    else
+    {
+        i_expect(expr->leftKind == EXPRESSION_EXPR);
+        print_expression(expr->leftExpr);
+    }
+
+    fprintf(stdout, " ");
+
+    if (expr->rightKind == EXPRESSION_VAR)
+    {
+        print_variable(expr->right);
+    }
+    else
+    {
+        i_expect(expr->rightKind == EXPRESSION_EXPR);
+        print_expression(expr->rightExpr);
+    }
+    fprintf(stdout, ")");
+}
+
+#define CASE(name, printName) case EXPR_OP_##name: { print_expression_op(expr, #printName); } break
 
 internal void
 print_expression(Expression *expr)
@@ -241,38 +371,22 @@ print_expression(Expression *expr)
             }
         } break;
 
-        case EXPR_OP_ADD:
-        case EXPR_OP_SUB:
-        {
-            fprintf(stdout, "(%s ", expr->op == EXPR_OP_ADD ? "add" : "sub");
-
-            if (expr->leftKind == EXPRESSION_VAR)
-            {
-                print_variable(expr->left);
-            }
-            else
-            {
-                i_expect(expr->leftKind == EXPRESSION_EXPR);
-                print_expression(expr->leftExpr);
-            }
-
-            fprintf(stdout, " ");
-
-            if (expr->rightKind == EXPRESSION_VAR)
-            {
-                print_variable(expr->right);
-            }
-            else
-            {
-                i_expect(expr->rightKind == EXPRESSION_EXPR);
-                print_expression(expr->rightExpr);
-            }
-            fprintf(stdout, ")");
-        } break;
+        CASE(MUL, mul);
+        CASE(DIV, div);
+        CASE(AND, and);
+        CASE(SLL, sll);
+        CASE(SRL, srl);
+        CASE(SRA, sra);
+        CASE(SUB, sub);
+        CASE(ADD, add);
+        CASE(OR, or);
+        CASE(XOR, xor);
 
         INVALID_DEFAULT_CASE;
     }
 }
+
+#undef CASE
 
 internal void
 print_assignment(Assignment *assign)

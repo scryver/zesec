@@ -27,8 +27,16 @@ typedef struct Variable
 typedef enum ExpressionOp
 {
     EXPR_OP_NOP,
-    EXPR_OP_ADD,
+    EXPR_OP_MUL,
+    EXPR_OP_DIV,
+    EXPR_OP_AND,
+    EXPR_OP_SLL,
+    EXPR_OP_SRL,
+    EXPR_OP_SRA,
     EXPR_OP_SUB,
+    EXPR_OP_ADD,
+    EXPR_OP_OR,
+    EXPR_OP_XOR,
 } ExpressionOp;
 typedef enum ExpressionKind
 {
@@ -79,3 +87,8 @@ typedef struct Program
     u32 nrStatements;
     Statement statements[MAX_NR_STATEMENTS];
 } Program;
+
+internal void print_constant(Constant *constant);
+internal void print_identifier(Identifier *id);
+internal void print_variable(Variable *var);
+internal void print_expression(Expression *expr);

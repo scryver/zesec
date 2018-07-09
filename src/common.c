@@ -39,3 +39,15 @@ strings_are_equal(String a, String b)
 
     return result;
 }
+
+internal u32
+string_length(char *cString)
+{
+    u32 length = 0;
+    while (*cString++)
+    {
+        ++length;
+    }
+    return length;
+}
+

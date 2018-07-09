@@ -3,8 +3,16 @@ typedef enum TokenKind
     TOKEN_NULL,
     TOKEN_NUMBER,
     TOKEN_ID,
-    TOKEN_ADD,
+    TOKEN_MUL,
+    TOKEN_DIV,
+    TOKEN_AND,
+    TOKEN_SLL,
+    TOKEN_SRL,
+    TOKEN_SRA,
     TOKEN_SUB,
+    TOKEN_ADD,
+    TOKEN_OR,
+    TOKEN_XOR,
     TOKEN_ASSIGN,
     TOKEN_SEMI,
     TOKEN_EOL,
@@ -16,8 +24,20 @@ typedef struct Token
     TokenKind kind;
     String    value;
 
+    u32 colNumber;
+    u32 lineNumber;
+    String filename;
+
     struct Token *nextToken;
 } Token;
+
+typedef struct TokenEater
+{
+    u32 columnNumber;
+    u32 lineNumber;
+
+    char *scanner;
+} TokenEater;
 
 #define MAX_TOKEN_MEM_CHUNK 2048
 internal inline Token *
