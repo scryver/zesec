@@ -18,6 +18,7 @@ typedef enum TokenKind
     TOKEN_ASSIGN,
     TOKEN_SEMI,
     TOKEN_EOL,
+    TOKEN_EOF,
 
     NUM_TOKENS, // NOTE(michiel): Always at the end of the enum to indicate how many tokens we have.
 } TokenKind;

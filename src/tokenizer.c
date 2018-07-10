@@ -185,9 +185,9 @@ tokenize(Buffer buffer, String filename)
     if ((prevToken->kind != TOKEN_EOL) &&
         (prevToken->kind != TOKEN_SEMI))
     {
-        fprintf(stderr, "The Tokenizer expects the token stream to end with a newline or semi-colon, but you're forgiven for now...\n");
+        //fprintf(stderr, "The Tokenizer expects the token stream to end with a newline or semi-colon, but you're forgiven for now...\n");
         Token *token = next_token(result, tokenIndex++);
-        token->kind = TOKEN_EOL;
+        token->kind = TOKEN_EOF;
         token->value.size = 1;
         token->value.data = (u8 *)"\n";
         token->colNumber = 0;

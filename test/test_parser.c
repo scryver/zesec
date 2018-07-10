@@ -6,6 +6,69 @@
 #include "../src/tokenizer.c"
 #include "../src/parser.c"
 
+#define TEST_ID(n) at = n##Token; \
+    Identifier *n##Id = parse_identifier(&at); \
+    i_expect(strings_are_equal(n##Id->name, n##String))
+#define TEST_AGAIN(n) at = n##Token; \
+    Identifier *n##Again = parse_identifier(&at); \
+    i_expect(n##Again == n##Id)
+
+
+int test_parse_identifiers(void)
+{
+    String xString = create_string("x");
+    String yString = create_string("y");
+    String zString = create_string("z");
+    String aString = create_string("a");
+    String bString = create_string("b");
+    String cString = create_string("c");
+    String _String = create_string("_");
+    String underString = create_string("_sadsad");
+    String underNumString = create_string("_01654");
+    String longString = create_string("das646sd_asda56aw5e");
+
+    Token *xToken = tokenize_string(xString);
+    Token *yToken = tokenize_string(yString);
+    Token *zToken = tokenize_string(zString);
+    Token *aToken = tokenize_string(aString);
+    Token *bToken = tokenize_string(bString);
+    Token *cToken = tokenize_string(cString);
+    Token *_Token = tokenize_string(_String);
+    Token *underToken = tokenize_string(underString);
+    Token *underNumToken = tokenize_string(underNumString);
+    Token *longToken = tokenize_string(longString);
+
+    Token *TEST_ID(x);
+    TEST_ID(y);
+    TEST_ID(z);
+    TEST_ID(a);
+    TEST_ID(b);
+    TEST_ID(c);
+    TEST_ID(_);
+    TEST_ID(under);
+    TEST_ID(underNum);
+    TEST_ID(long);
+
+    TEST_AGAIN(x);
+    TEST_AGAIN(y);
+    TEST_AGAIN(z);
+    TEST_AGAIN(a);
+    TEST_AGAIN(b);
+    TEST_AGAIN(c);
+    TEST_AGAIN(_);
+    TEST_AGAIN(under);
+    TEST_AGAIN(underNum);
+    TEST_AGAIN(long);
+
+    i_expect(xAgain != yId);
+    i_expect(yAgain != zId);
+
+    return 0;
+}
+
+#undef TEST_ID
+#undef TEST_AGAIN
+
 // TODO(michiel): Correct spelling
 int test_parse_parentisize(void)
 {
@@ -99,7 +162,8 @@ int test_parse_statement(void)
 int test_parser(void)
 {
     int errors = 0;
-    errors |= test_parse_parentisize();
+    errors |= test_parse_identifiers();
+    //errors |= test_parse_parentisize();
     errors |= test_parse_statement();
     return errors;
 }
