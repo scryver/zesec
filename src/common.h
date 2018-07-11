@@ -16,7 +16,12 @@
 #define i_expect  assert
 #define INVALID_DEFAULT_CASE default: { i_expect(0 && "Invalid default case"); } break
 
-#define is_pow2(x) (((x) != 0) && (((x) & ((x)-1)) == 0))
+#define array_count(x)       (sizeof(x) / sizeof(x[0]))
+#define is_pow2(x)           (((x) != 0) && (((x) & ((x)-1)) == 0))
+#define align_down(x, a)     ((x) & ~((a) - 1))
+#define align_up(x, a)       align_down((x) + (a) - 1, (a))
+#define align_ptr_down(p, a) ((void *)align_down((uptr)(p), (a)))
+#define align_ptr_up(p, a)   ((void *)align_up((uptr)(p), (a)))
 
 #define U8_MAX    0xFF
 #define U16_MAX   0xFFFF
@@ -87,14 +92,6 @@ internal inline void *allocate_size(u32 size, u32 flags)
     return result;
 }
 
-internal inline void *
-reallocate_size(void *data, u32 size)
-{
-    void *result = NULL;
-    result = realloc(data, size);
-    return result;
-}
-
 internal inline Buffer allocate_buffer(u32 size, u32 flags)
 {
     Buffer result = {.size = size};
@@ -103,6 +100,14 @@ internal inline Buffer allocate_buffer(u32 size, u32 flags)
     {
         result.size = 0;
     }
+    return result;
+}
+
+internal inline void *
+reallocate_size(void *data, u32 size)
+{
+    void *result = NULL;
+    result = realloc(data, size);
     return result;
 }
 
@@ -126,6 +131,7 @@ typedef struct BufferHeader
 #define buf_push(buf, val)      (buf_maybegrow(buf, 1), (buf)[buf_len_(buf)++] = (val))
 #define buf_add(buf, n)         (buf_maybegrow(buf, n), buf_len_(buf) += (n), &(buf)[buf_len_(buf) - (n)])
 #define buf_last(buf)           ((buf)[buf_len(buf) - 1])
+#define buf_end(buf)            ((buf) + buf_len(buf))
 #define buf_len(buf)            ((buf) ? buf_len_(buf) : 0)
 #define buf_cap(buf)            ((buf) ? buf_cap_(buf) : 0)
 
@@ -197,6 +203,51 @@ buf_put_(void **bufPtr, void *data, u32 newLength, u32 elemSize)
     buf_hdr(buf)->len += newLength;
 }
 #endif
+
+typedef struct Arena
+{
+    char *at;
+    char *end;
+    char **blocks;
+} Arena;
+
+#define ARENA_ALIGNMENT      8
+#define ARENA_ALLOC_MIN_SIZE (1024 * 1024)
+
+internal inline void
+arena_grow(Arena *arena, uptr newSize)
+{
+    uptr size = align_up(newSize < ARENA_ALLOC_MIN_SIZE ? ARENA_ALLOC_MIN_SIZE : newSize, ARENA_ALIGNMENT);
+    arena->at = allocate_size(size, 0);
+    i_expect(arena->at == align_ptr_down(arena->at, ARENA_ALIGNMENT));
+    arena->end = arena->at + size;
+    buf_push(arena->blocks, arena->at);
+}
+
+internal inline void *
+arena_allocate(Arena *arena, uptr newSize)
+{
+    if (newSize > (uptr)(arena->end - arena->at))
+    {
+        arena_grow(arena, newSize);
+        i_expect(newSize <= (uptr)(arena->end - arena->at));
+    }
+    void *at = arena->at;
+    arena->at = align_ptr_up(arena->at + newSize, ARENA_ALIGNMENT);
+    i_expect(arena->at <= arena->end);
+    i_expect(at == align_ptr_down(at, ARENA_ALIGNMENT));
+    return at;
+}
+
+internal void
+arena_free(Arena *arena)
+{
+    for (char **it = arena->blocks; it != buf_end(arena->blocks); ++it)
+    {
+        deallocate(*it);
+    }
+    buf_free(arena->blocks);
+}
 
 // NOTE(michiel): Better hash functions
 internal inline u64

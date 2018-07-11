@@ -89,6 +89,7 @@ typedef struct InternString
 } InternString;
 
 global Map gInternStrings;
+global Arena gInternArena;
 
 internal String
 str_internalize(String str)
@@ -107,7 +108,7 @@ str_internalize(String str)
         it = it->next;
     }
 
-    InternString *newIntern = allocate_size(offsetof(InternString, data) + str.size, 0);
+    InternString *newIntern = arena_allocate(&gInternArena, offsetof(InternString, data) + str.size);
     newIntern->size = str.size;
     newIntern->next = intern;
     memcpy(newIntern->data, str.data, str.size);
