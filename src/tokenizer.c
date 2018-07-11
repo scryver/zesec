@@ -7,8 +7,7 @@ advance(TokenEater *eater)
 
 #define SIMPLE_TOKEN(type) token = next_token(result, tokenIndex++); \
     token->kind = TOKEN_##type; \
-    token->value.size = 1; \
-    token->value.data = (u8 *)eater.scanner; \
+    token->value = str_internalize((String){.size=1, .data= (u8 *)eater.scanner}); \
     token->colNumber = eater.columnNumber; \
     advance(&eater)
 
@@ -129,15 +128,18 @@ tokenize(Buffer buffer, String filename)
         {
             token = next_token(result, tokenIndex++);
             token->kind = TOKEN_NUMBER;
-            token->value.size = 1;
-            token->value.data = (u8 *)eater.scanner;
+            String value = {
+                .size = 1,
+                .data = (u8 *)eater.scanner,
+            };
             token->colNumber = eater.columnNumber;
             advance(&eater);
             while (('0' <= eater.scanner[0]) && (eater.scanner[0] <= '9'))
             {
-                ++token->value.size;
+                ++value.size;
                 advance(&eater);
             }
+            token->value = str_internalize(value);
         }
         else if ((eater.scanner[0] == '_') ||
                  (('A' <= eater.scanner[0]) && (eater.scanner[0] <= 'Z')) ||
@@ -145,8 +147,10 @@ tokenize(Buffer buffer, String filename)
         {
             token = next_token(result, tokenIndex++);
             token->kind = TOKEN_ID;
-            token->value.size = 1;
-            token->value.data = (u8 *)eater.scanner;
+            String value = {
+                .size = 1,
+                .data = (u8 *)eater.scanner,
+            };
             token->colNumber = eater.columnNumber;
             advance(&eater);
             while ((eater.scanner[0] == '_') ||
@@ -154,9 +158,10 @@ tokenize(Buffer buffer, String filename)
                    (('a' <= eater.scanner[0]) && (eater.scanner[0] <= 'z')) ||
                    (('0' <= eater.scanner[0]) && (eater.scanner[0] <= '9')))
             {
-                ++token->value.size;
+                ++value.size;
                 advance(&eater);
             }
+            token->value = str_internalize(value);
         }
         else
         {
@@ -188,8 +193,7 @@ tokenize(Buffer buffer, String filename)
         //fprintf(stderr, "The Tokenizer expects the token stream to end with a newline or semi-colon, but you're forgiven for now...\n");
         Token *token = next_token(result, tokenIndex++);
         token->kind = TOKEN_EOF;
-        token->value.size = 1;
-        token->value.data = (u8 *)"\n";
+        token->value = str_internalize_cstring("");
         token->colNumber = 0;
         token->lineNumber = eater.lineNumber;
         token->filename = filename;
@@ -204,16 +208,17 @@ tokenize(Buffer buffer, String filename)
 internal Token *
 tokenize_string(String tokenString)
 {
-    char *anonymous = "<anonymous>";
-    return tokenize(*(Buffer *)&tokenString,
-                    (String){.size=string_length(anonymous), .data=(u8 *)anonymous});
+    String anonymous = str_internalize_cstring("<anonymous>");
+    return tokenize(*(Buffer *)&tokenString, anonymous);
 }
 
 internal Token *
 tokenize_file(char *filename)
 {
+    String fileName = str_internalize_cstring(filename);
+    // TODO(michiel): read_entire_file(String) ??
     Buffer fileBuffer = read_entire_file(filename);
-    return tokenize(fileBuffer, (String){.size=string_length(filename),.data=(u8 *)filename});
+    return tokenize(fileBuffer, fileName);
 }
 
 #define CASE(name) case TOKEN_##name: { fprintf(fileStream.file, #name); } break
