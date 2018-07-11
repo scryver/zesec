@@ -1,6 +1,5 @@
-#define MAX_IDENTIFIERS 1024
-global Identifier *gIdentifiers[MAX_IDENTIFIERS];
-global u32 gIdentifierCount;
+global Map gIdentifierMap_ = {0};
+global Map *gIdentifierMap = &gIdentifierMap_;
 
 internal int
 parse_number(String s)
@@ -28,26 +27,17 @@ internal Identifier *
 parse_identifier(Token **at)
 {
     i_expect((*at)->kind == TOKEN_ID);
-    Identifier *result = 0;
+    String id = str_internalize((*at)->value);
     // NOTE(michiel): Check if we already got this identifier
-    for (u32 idIndex = 0; idIndex < gIdentifierCount; ++idIndex)
-    {
-        Identifier *ident = gIdentifiers[idIndex];
-        if (strings_are_equal(ident->name, (*at)->value))
-        {
-            result = ident;
-            *at = (*at)->nextToken;
-            break;
-        }
-    }
+    Identifier *result = map_get(gIdentifierMap, id.data);
 
     if (!result)
     {
-        i_expect(gIdentifierCount < MAX_IDENTIFIERS);
-        result = gIdentifiers[gIdentifierCount++] = allocate_struct(Identifier, 0);
-        result->name = (*at)->value;
-        *at = (*at)->nextToken;
+        result = allocate_struct(Identifier, 0);
+        result->name = id;
+        map_put(gIdentifierMap, result->name.data, result);
     }
+    *at = (*at)->nextToken;
     return result;
 }
 
@@ -256,6 +246,12 @@ parse_assignment(Token **at)
 {
     Assignment *result = allocate_struct(Assignment, 0);
     result->id = parse_identifier(at);
+    if ((*at)->kind != TOKEN_ASSIGN)
+    {
+        fprintf(stderr, "TOKEN_ASSIGN expected, got ");
+        print_token((FileStream){stderr}, *at);
+        fprintf(stderr, "\n");
+    }
     i_expect((*at)->kind == TOKEN_ASSIGN);
     *at = (*at)->nextToken;
     result->expr = parse_expression(at);
@@ -277,6 +273,8 @@ parse_statement(Token **at, Statement *statement)
     }
 }
 
+#define IS_END_STATEMENT(token) ((token->kind == TOKEN_EOF) || (token->kind == TOKEN_EOL) || (token->kind == TOKEN_SEMI))
+
 internal Program *
 parse(Token *tokens)
 {
@@ -290,16 +288,16 @@ parse(Token *tokens)
 
         do
         {
-            if (!((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI)))
+            if (!IS_END_STATEMENT(at))
             {
                 fprintf(stderr, "Statement not closed by newline or semi-colon!\nStuck at: ");
                 print_token((FileStream){stderr}, at);
                 fprintf(stderr, "\n");
             }
-            i_expect((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI));
+            i_expect(IS_END_STATEMENT(at));
             at = at->nextToken;
         }
-        while (at && ((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI)));
+        while (at && IS_END_STATEMENT(at));
     }
 
     return program;

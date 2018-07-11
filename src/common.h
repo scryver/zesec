@@ -16,6 +16,8 @@
 #define i_expect  assert
 #define INVALID_DEFAULT_CASE default: { i_expect(0 && "Invalid default case"); } break
 
+#define is_pow2(x) (((x) != 0) && (((x) & ((x)-1)) == 0))
+
 #define U8_MAX    0xFF
 #define U16_MAX   0xFFFF
 #define U32_MAX   0xFFFFFFFF
@@ -106,19 +108,18 @@ internal inline Buffer allocate_buffer(u32 size, u32 flags)
 
 internal inline void deallocate(void *mem)
 {
-    i_expect(mem);
-    free(mem);
+    if (mem)
+    {
+        free(mem);
+    }
 }
 
 typedef struct BufferHeader
 {
-    u64 magic;
     u32 len;
     u32 cap;
     u8 data[];
 } BufferHeader;
-
-#define BUF_MAGIC 0x457ABF36A4ED8654
 
 #define buf_free(buf)           ((buf) ? deallocate(buf_hdr(buf)), NULL : NULL)
 #define buf_clear(buf)          ((buf) ? (buf_len_(buf) = 0, (buf)) : 0)
@@ -197,113 +198,140 @@ buf_put_(void **bufPtr, void *data, u32 newLength, u32 elemSize)
 }
 #endif
 
+// NOTE(michiel): Better hash functions
+internal inline u64
+hash_u64(u64 x) {
+    x *= 0xFF51AFD7ED558CCD;
+    x ^= x >> 32;
+    return x;
+}
+internal inline u64
+hash_ptr(void *ptr) {
+    return hash_u64((uptr)ptr);
+}
+
+internal inline u64
+hash_mix(u64 x, u64 y) {
+    x ^= y;
+    return hash_u64(x);
+}
+
+internal inline u64
+hash_bytes(void *ptr, uptr len) {
+    u64 x = 0xCBF29CE484222325;
+    char *buf = (char *)ptr;
+    for (uptr i = 0; i < len; i++) {
+        x ^= buf[i];
+        x *= 0x100000001B3;
+        x ^= x >> 32;
+    }
+    return x;
+}
+
 typedef struct Map
 {
-    u32 size;
-    void **keys;
-    void **values;
+    u64 *keys;
+    u64 *values;
+    u32 len;
+    u32 cap;
 } Map;
 
-internal inline u32
-get_hash(uptr key, u32 maxSize)
+#define map_get(map, key)               (void *)(uptr)map_get_u64_from_u64(map, (u64)(uptr)(key))
+#define map_put(map, key, val)          map_put_u64_from_u64(map, (u64)(uptr)(key), (u64)(uptr)(val))
+#define map_get_u64(map, key)           map_get_u64_from_u64(map, (u64)(uptr)(key))
+#define map_put_u64(map, key, val)      map_put_u64_from_u64(map, (u64)(uptr)(key), val)
+#define map_get_from_u64(map, key)      (void *)(uptr)map_get_u64_from_u64(map, key)
+#define map_put_from_u64(map, key, val) map_put_u64_from_u64(map, key, (u64)(uptr)(val));
+
+internal inline u64
+map_get_u64_from_u64(Map *map, u64 key)
 {
-    i_expect(maxSize);
-    u32 hash = (key >> 32) ^ (key & U32_MAX);
-    hash = (hash << 17) + hash;
-    hash = hash % maxSize;
-    return hash;
+    u64 result = 0;
+    if (map->len > 0)
+    {
+        i_expect(is_pow2(map->cap));
+        uptr hash = (uptr)hash_u64(key);
+        i_expect(map->len < map->cap);
+        for (;;)
+        {
+            hash &= map->cap - 1;
+            if (map->keys[hash] == key)
+            {
+                result = map->values[hash];
+                break;
+            }
+            else if (!map->keys[hash])
+            {
+                result = 0;
+                break;
+            }
+            ++hash;
+        }
+    }
+    else
+    {
+        result = 0;
+    }
+
+    return result;
 }
 
-internal inline void map_grow(Map **mapPtr);
-
-internal inline void *
-map_get(Map *map, void *key)
-{
-    i_expect(key);
-    if (map->size == 0)
-    {
-        return 0;
-    }
-    u32 hash = get_hash((uptr)key, map->size);
-
-    u32 index = hash;
-    while (map->keys[index] != key)
-    {
-        ++index;
-        if (index >= map->size)
-        {
-            index = 0;
-        }
-
-        if (index == hash)
-        {
-            // NOTE(michiel): Complete loop, so not found
-            return 0;
-        }
-    }
-
-    return map->values + index;
-}
-
-#define map_put(map, key, value) map_put_(&(map), key, &value, sizeof(value))
-internal inline b32
-map_put_(Map **mapPtr, void *key, void *value, u64 itemSize)
-{
-    Map *map = *mapPtr;
-    i_expect(key);
-    if (map->size == 0)
-    {
-        map_grow(&map);
-    }
-    u32 hash = get_hash((uptr)key, map->size);
-
-    u32 index = hash;
-    while (map->keys[index] != 0)
-    {
-        ++index;
-        if (index >= map->size)
-        {
-            index = 0;
-        }
-
-        if (index == hash)
-        {
-            // NOTE(michiel): Complete loop, we're full
-            map_grow(&map);
-            return map_put_(&map, key, value, itemSize);
-        }
-    }
-
-    map->keys[index] = key;
-    memcpy(map->values + index, value, itemSize);
-
-    *mapPtr = map;
-
-    return 0;
-}
+internal inline void map_put_u64_from_u64(Map *map, u64 key, u64 value);
 
 internal inline void
-map_grow(Map **mapPtr)
+map_grow(Map *map, uptr newCap)
 {
-    Map *map = *mapPtr;
-    Map *newMap = &(Map){0};
-    newMap->size = map->size ? map->size * 2 : 1024;
-    newMap->keys = (void **)allocate_array(newMap->size, uptr, 0);
-    newMap->values = (void **)allocate_array(newMap->size, uptr, 0);
-    for (u32 mapIndex = 0; mapIndex < map->size; ++mapIndex)
+    newCap = (newCap < 16) ? 16 : newCap;
+    Map newMap = {
+        .keys = allocate_array(newCap, u64, 0),
+        .values = allocate_array(newCap, u64, ALLOC_NOCLEAR),
+        .cap = newCap,
+    };
+    for (u32 mapIndex = 0; mapIndex < map->cap; ++mapIndex)
     {
         if (map->keys[mapIndex])
         {
-            map_put(newMap, map->keys[mapIndex], map->values[mapIndex]);
+            map_put_u64_from_u64(&newMap, map->keys[mapIndex], map->values[mapIndex]);
         }
     }
-    if (map->keys)
+    deallocate(map->keys);
+    deallocate(map->values);
+    *map = newMap;
+}
+
+internal inline void
+map_put_u64_from_u64(Map *map, u64 key, u64 value)
+{
+    i_expect(key);
+    if (!value)
     {
-        deallocate(map->keys);
+        // NOTE(michiel): Don't put zeroes in
+        return;
     }
-    if (map->values)
+
+    if ((2 * map->len) >= map->cap)
     {
-        deallocate(map->values);
+        map_grow(map, 2 * map->cap);
     }
-    *mapPtr = newMap;
+
+    i_expect(2 * map->len < map->cap);
+    i_expect(is_pow2(map->cap));
+    uptr hash = (uptr)hash_u64(key);
+    for (;;)
+    {
+        hash &= map->cap - 1;
+        if (!map->keys[hash])
+        {
+            ++map->len;
+            map->keys[hash] = key;
+            map->values[hash] = value;
+            break;
+        }
+        else if (map->keys[hash] == key)
+        {
+            map->values[hash] = value;
+            break;
+        }
+        ++hash;
+    }
 }

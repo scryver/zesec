@@ -42,11 +42,10 @@ create_string(char *cString)
 internal b32
 strings_are_equal(String a, String b)
 {
-    b32 result = false;
+    b32 result = (a.size == b.size);
 
-    if (a.size == b.size)
+    if (result)
     {
-        result = true;
         for (u32 nameIndex = 0; nameIndex < a.size; ++nameIndex)
         {
             if (a.data[nameIndex] != b.data[nameIndex])
@@ -60,3 +59,65 @@ strings_are_equal(String a, String b)
     return result;
 }
 
+internal b32
+strings_are_equal_a(uptr aSize, char *a, String b)
+{
+    b32 result = (aSize == b.size);
+
+    if (result)
+    {
+        for (u32 nameIndex = 0; nameIndex < aSize; ++nameIndex)
+        {
+            if (a[nameIndex] != b.data[nameIndex])
+            {
+                result = false;
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+// NOTE(michiel): For internal storage of strings
+typedef struct InternString
+{
+    struct InternString *next;
+
+    u32 size;
+    char data[];
+} InternString;
+
+global Map gInternStrings;
+
+internal String
+str_internalize(String str)
+{
+    u64 hash = hash_bytes(str.data, str.size);
+    u64 key = hash ? hash : 1;
+    InternString *intern = map_get_from_u64(&gInternStrings, key);
+    InternString *it = intern;
+    //for (InternString *it = intern; it; it = it->next)
+    while (it)
+    {
+        if (strings_are_equal_a(it->size, it->data, str))
+        {
+            return (String){.size = it->size, .data=(u8 *)it->data};
+        }
+        it = it->next;
+    }
+
+    InternString *newIntern = allocate_size(offsetof(InternString, data) + str.size, 0);
+    newIntern->size = str.size;
+    newIntern->next = intern;
+    memcpy(newIntern->data, str.data, str.size);
+    map_put_from_u64(&gInternStrings, key, newIntern);
+    return (String){.size=newIntern->size, .data=(u8 *)newIntern->data};
+}
+
+internal String
+str_internalize_cstring(char *cString)
+{
+    String str = create_string(cString);
+    return str_internalize(str);
+}

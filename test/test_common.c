@@ -47,7 +47,7 @@ int test_auto_map(void)
     Bammy harry = {1, -3.0f, 2};
 
     i_expect(map_get(bammyMap, &harry) == 0);
-    map_put(bammyMap, &harry, harry);
+    map_put(bammyMap, &harry, &harry);
     Bammy *gotHim = map_get(bammyMap, &harry);
     i_expect(gotHim);
     i_expect(gotHim->x == harry.x);
