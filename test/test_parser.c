@@ -72,6 +72,7 @@ int test_parse_identifiers(void)
 // TODO(michiel): Correct spelling
 int test_parse_parentisize(void)
 {
+    FileStream testStream = {.file=stdout};
     String parentisized = create_string("(4 + 5) * 2;");
     String unparentisized = create_string("4 + 5 * 2;");
 
@@ -81,24 +82,11 @@ int test_parse_parentisize(void)
     Expression *exprParen = parse_expression(&tokenParen);
     Expression *exprNonParen = parse_expression(&tokenNonParen);
 
-    i_expect(exprParen);
-    i_expect(exprParen->op == EXPR_OP_MUL);
-    i_expect(exprParen->leftKind == EXPRESSION_EXPR);
-    i_expect(exprParen->leftExpr);
-    i_expect(exprParen->leftExpr->op == EXPR_OP_ADD);
-    i_expect(exprParen->leftExpr->left);
-    i_expect(exprParen->leftExpr->left->kind == VARIABLE_CONSTANT);
-    i_expect(exprParen->leftExpr->left->constant);
-    i_expect(exprParen->leftExpr->left->constant->value == 4);
-    i_expect(exprParen->leftExpr->right);
-    i_expect(exprParen->leftExpr->right->kind == VARIABLE_CONSTANT);
-    i_expect(exprParen->leftExpr->right->constant);
-    i_expect(exprParen->leftExpr->right->constant->value == 5);
-    i_expect(exprParen->rightKind == EXPRESSION_VAR);
-    i_expect(exprParen->right);
-    i_expect(exprParen->right->kind == VARIABLE_CONSTANT);
-    i_expect(exprParen->right->constant);
-    i_expect(exprParen->right->constant->value == 2);
+    print_expression(testStream, exprParen);
+    fprintf(stdout, "\n");
+    print_expression(testStream, exprNonParen);
+    fprintf(stdout, "\n");
+    fflush(stdout);
 
     i_expect(exprNonParen);
     i_expect(exprNonParen->op == EXPR_OP_ADD);
@@ -118,6 +106,25 @@ int test_parse_parentisize(void)
     i_expect(exprNonParen->rightExpr->right->kind == VARIABLE_CONSTANT);
     i_expect(exprNonParen->rightExpr->right->constant);
     i_expect(exprNonParen->rightExpr->right->constant->value == 2);
+
+    i_expect(exprParen);
+    i_expect(exprParen->op == EXPR_OP_MUL);
+    i_expect(exprParen->leftKind == EXPRESSION_EXPR);
+    i_expect(exprParen->leftExpr);
+    i_expect(exprParen->leftExpr->op == EXPR_OP_ADD);
+    i_expect(exprParen->leftExpr->left);
+    i_expect(exprParen->leftExpr->left->kind == VARIABLE_CONSTANT);
+    i_expect(exprParen->leftExpr->left->constant);
+    i_expect(exprParen->leftExpr->left->constant->value == 4);
+    i_expect(exprParen->leftExpr->right);
+    i_expect(exprParen->leftExpr->right->kind == VARIABLE_CONSTANT);
+    i_expect(exprParen->leftExpr->right->constant);
+    i_expect(exprParen->leftExpr->right->constant->value == 5);
+    i_expect(exprParen->rightKind == EXPRESSION_VAR);
+    i_expect(exprParen->right);
+    i_expect(exprParen->right->kind == VARIABLE_CONSTANT);
+    i_expect(exprParen->right->constant);
+    i_expect(exprParen->right->constant->value == 2);
 
     return 0;
 }
@@ -163,7 +170,7 @@ int test_parser(void)
 {
     int errors = 0;
     errors |= test_parse_identifiers();
-    //errors |= test_parse_parentisize();
+    errors |= test_parse_parentisize();
     errors |= test_parse_statement();
     return errors;
 }

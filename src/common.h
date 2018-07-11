@@ -58,6 +58,7 @@ typedef Buffer String;
 // TODO(michiel): Own struct for this
 typedef struct FileStream
 {
+    b32 verbose;
     FILE *file;
 } FileStream;
 
