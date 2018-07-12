@@ -47,6 +47,7 @@ typedef enum ExpressionKind
 typedef struct Expression
 {
     ExpressionOp op;
+    b32 complete;
 
     ExpressionKind leftKind;
     union {
@@ -89,7 +90,8 @@ typedef struct Program
     Statement statements[MAX_NR_STATEMENTS];
 } Program;
 
-internal void print_constant(Constant *constant, b32 verbose);
-internal void print_identifier(Identifier *id, b32 verbose);
-internal void print_variable(Variable *var, b32 verbose);
-internal void print_expression(Expression *expr, b32 verbose);
+internal void print_constant(FileStream stream, Constant *constant);
+internal void print_identifier(FileStream stream, Identifier *id);
+internal void print_variable(FileStream stream, Variable *var);
+internal void print_expression(FileStream stream, Expression *expr);
+

@@ -17,7 +17,7 @@ int main(int argc, char **argv)
         Token *tokens = tokenize_file(argv[1]);
         Program *program = parse(tokens);
 
-        print_parsed_program(program, false);
+        print_parsed_program((FileStream){.file=stdout}, program);
     }
     else
     {

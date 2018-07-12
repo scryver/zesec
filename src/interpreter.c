@@ -60,8 +60,16 @@ get_variable_value(Variable *variable)
     }
     else
     {
-        i_expect(variable->kind == VARIABLE_CONSTANT);
-        result = variable->constant->value;
+        if (!(variable->kind == VARIABLE_CONSTANT))
+        {
+            fprintf(stderr, "Unknown variable kind in: ");
+            print_variable((FileStream){.verbose=true, .file=stderr}, variable);
+            fprintf(stderr, "\n");
+        }
+        else
+        {
+            result = variable->constant->value;
+        }
     }
     return result;
 }

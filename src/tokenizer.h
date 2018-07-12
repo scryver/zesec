@@ -13,9 +13,12 @@ typedef enum TokenKind
     TOKEN_ADD,
     TOKEN_OR,
     TOKEN_XOR,
+    TOKEN_PAREN_OPEN,
+    TOKEN_PAREN_CLOSE,
     TOKEN_ASSIGN,
     TOKEN_SEMI,
     TOKEN_EOL,
+    TOKEN_EOF,
 
     NUM_TOKENS, // NOTE(michiel): Always at the end of the enum to indicate how many tokens we have.
 } TokenKind;

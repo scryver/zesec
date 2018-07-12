@@ -1,6 +1,5 @@
-#define MAX_IDENTIFIERS 1024
-global Identifier *gIdentifiers[MAX_IDENTIFIERS];
-global u32 gIdentifierCount;
+global Map gIdentifierMap_ = {0};
+global Map *gIdentifierMap = &gIdentifierMap_;
 
 internal int
 parse_number(String s)
@@ -28,53 +27,63 @@ internal Identifier *
 parse_identifier(Token **at)
 {
     i_expect((*at)->kind == TOKEN_ID);
-    Identifier *result = 0;
+    String id = str_internalize((*at)->value);
     // NOTE(michiel): Check if we already got this identifier
-    for (u32 idIndex = 0; idIndex < gIdentifierCount; ++idIndex)
-    {
-        Identifier *ident = gIdentifiers[idIndex];
-        if (strings_are_equal(ident->name, (*at)->value))
-        {
-            result = ident;
-            *at = (*at)->nextToken;
-            break;
-        }
-    }
+    Identifier *result = map_get(gIdentifierMap, id.data);
 
     if (!result)
     {
-        i_expect(gIdentifierCount < MAX_IDENTIFIERS);
-        result = gIdentifiers[gIdentifierCount++] = allocate_struct(Identifier, 0);
-        result->name = (*at)->value;
-        *at = (*at)->nextToken;
+        result = allocate_struct(Identifier, 0);
+        result->name = id;
+        map_put(gIdentifierMap, result->name.data, result);
     }
+    *at = (*at)->nextToken;
     return result;
 }
 
-internal Variable *
+typedef struct ParseVar
+{
+    b32 isExpr;
+    union
+    {
+        Variable *var;
+        Expression *expr;
+    };
+} ParseVar;
+
+internal Expression *parse_expression_add_op(Token **at, Expression *leftExpr);
+
+internal ParseVar
 parse_variable(Token **at)
 {
-    Variable *result = allocate_struct(Variable, 0);
-    if ((*at)->kind == TOKEN_NUMBER)
+    ParseVar result = {0};
+
+    if ((*at)->kind == TOKEN_ID)
     {
-        result->kind = VARIABLE_CONSTANT;
-        result->constant = parse_constant(at);
+        result.var = allocate_struct(Variable, 0);
+        result.var->kind = VARIABLE_IDENTIFIER;
+        result.var->id = parse_identifier(at);
+    }
+    else if ((*at)->kind == TOKEN_NUMBER)
+    {
+        result.var = allocate_struct(Variable, 0);
+        result.var->kind = VARIABLE_CONSTANT;
+        result.var->constant = parse_constant(at);
+    }
+    else if ((*at)->kind == TOKEN_PAREN_OPEN)
+    {
+        *at = (*at)->nextToken;
+        result.isExpr = true;
+        result.expr = parse_expression_add_op(at, 0);
+        result.expr->complete = true;
+        i_expect((*at)->kind == TOKEN_PAREN_CLOSE);
+        *at = (*at)->nextToken;
     }
     else
     {
-        if (!((*at)->kind == TOKEN_ID))
-        {
-            fprintf(stderr, "Unknown variable token: ");
-            print_token((FileStream){stderr}, *at);
-            fprintf(stderr, "\n");
-            deallocate(result);
-            result = 0;
-        }
-        else
-        {
-            result->kind = VARIABLE_IDENTIFIER;
-            result->id = parse_identifier(at);
-        }
+        fprintf(stderr, "Unknown variable token: ");
+        print_token((FileStream){.file=stderr}, *at);
+        fprintf(stderr, "\n");
     }
     return result;
 }
@@ -103,6 +112,7 @@ internal inline Expression *
 new_op_has_precedence(Expression *newOp, Expression *oldOp)
 {
     while ((oldOp->rightKind == EXPRESSION_EXPR) &&
+           (!oldOp->rightExpr->complete) &&
            (oldOp->rightExpr->op > newOp->op))
     {
         oldOp = oldOp->rightExpr;
@@ -129,8 +139,17 @@ parse_expression_precedence(Token **at, Expression *curExpr, Expression *leftExp
     Expression *result = curExpr;
     result->op = op;
     *at = (*at)->nextToken;
-    result->right = parse_variable(at);
-    result->rightKind = EXPRESSION_VAR;
+    ParseVar right = parse_variable(at);
+    if (right.isExpr)
+    {
+        result->rightExpr = right.expr;
+        result->rightKind = EXPRESSION_EXPR;
+    }
+    else
+    {
+        result->right = right.var;
+        result->rightKind = EXPRESSION_VAR;
+    }
 
     result = dust_off_expression(result);
     leftExpr = dust_off_expression(leftExpr);
@@ -157,12 +176,27 @@ internal Expression *
 parse_expression_mul_op(Token **at, Expression *leftExpr)
 {
     b32 done = false;
-    Expression *result = allocate_struct(Expression, 0);
-    result->op = EXPR_OP_NOP;
+    Expression *result;
+
     if (!leftExpr)
     {
-        result->left = parse_variable(at);
-        result->leftKind = EXPRESSION_VAR;
+        ParseVar left = parse_variable(at);
+        if (left.isExpr)
+        {
+            result = left.expr;
+        }
+        else
+        {
+            result = allocate_struct(Expression, 0);
+            result->op = EXPR_OP_NOP;
+            result->left = left.var;
+            result->leftKind = EXPRESSION_VAR;
+        }
+    }
+    else
+    {
+        result = allocate_struct(Expression, 0);
+        result->op = EXPR_OP_NOP;
     }
 
     switch ((*at)->kind)
@@ -207,7 +241,7 @@ parse_expression_add_op(Token **at, Expression *leftExpr)
             Expression *leftE = result->leftExpr;
 
             result->left = leftE->left;
-            result->leftKind = EXPRESSION_VAR;
+            result->leftKind = leftE->leftKind;
             deallocate(leftE);
         }
     }
@@ -248,7 +282,13 @@ parse_expression_add_op(Token **at, Expression *leftExpr)
 internal Expression *
 parse_expression(Token **at)
 {
-    return parse_expression_add_op(at, 0);
+    Expression *result = parse_expression_add_op(at, 0);
+    if ((result->op == EXPR_OP_NOP) &&
+        (result->leftKind == EXPRESSION_EXPR))
+    {
+        result = result->leftExpr;
+    }
+    return result;
 }
 
 internal Assignment *
@@ -256,6 +296,12 @@ parse_assignment(Token **at)
 {
     Assignment *result = allocate_struct(Assignment, 0);
     result->id = parse_identifier(at);
+    if ((*at)->kind != TOKEN_ASSIGN)
+    {
+        fprintf(stderr, "TOKEN_ASSIGN expected, got ");
+        print_token((FileStream){.file=stderr}, *at);
+        fprintf(stderr, "\n");
+    }
     i_expect((*at)->kind == TOKEN_ASSIGN);
     *at = (*at)->nextToken;
     result->expr = parse_expression(at);
@@ -277,6 +323,8 @@ parse_statement(Token **at, Statement *statement)
     }
 }
 
+#define IS_END_STATEMENT(token) ((token->kind == TOKEN_EOF) || (token->kind == TOKEN_EOL) || (token->kind == TOKEN_SEMI))
+
 internal Program *
 parse(Token *tokens)
 {
@@ -290,53 +338,53 @@ parse(Token *tokens)
 
         do
         {
-            if (!((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI)))
+            if (!IS_END_STATEMENT(at))
             {
                 fprintf(stderr, "Statement not closed by newline or semi-colon!\nStuck at: ");
-                print_token((FileStream){stderr}, at);
+                print_token((FileStream){.file=stderr}, at);
                 fprintf(stderr, "\n");
             }
-            i_expect((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI));
+            i_expect(IS_END_STATEMENT(at));
             at = at->nextToken;
         }
-        while (at && ((at->kind == TOKEN_EOL) || (at->kind == TOKEN_SEMI)));
+        while (at && IS_END_STATEMENT(at));
     }
 
     return program;
 }
 
 internal void
-print_constant(Constant *constant, b32 verbose)
+print_constant(FileStream stream, Constant *constant)
 {
     char *format = "%d";
-    if (verbose)
+    if (stream.verbose)
     {
-        format = "(const %d)";
+        format = "[const %d]";
     }
-    fprintf(stdout, format, constant->value);
+    fprintf(stream.file, format, constant->value);
 }
 
 internal void
-print_identifier(Identifier *id, b32 verbose)
+print_identifier(FileStream stream, Identifier *id)
 {
     char *format = "'%.*s'";
-    if (verbose)
+    if (stream.verbose)
     {
-        format = "(id '%.*s')";
+        format = "[id '%.*s']";
     }
-    fprintf(stdout, format, id->name.size, (char *)id->name.data);
+    fprintf(stream.file, format, id->name.size, (char *)id->name.data);
 }
 
 internal void
-print_variable(Variable *var, b32 verbose)
+print_variable(FileStream stream, Variable *var)
 {
-    if (verbose)
+    if (stream.verbose)
     {
-        fprintf(stdout, "(var ");
+        fprintf(stream.file, "[var ");
     }
     if (!var)
     {
-        fprintf(stdout, "EMPTY_VAR");
+        fprintf(stream.file, "EMPTY_VAR");
     }
     else
     {
@@ -349,59 +397,62 @@ print_variable(Variable *var, b32 verbose)
 
             case VARIABLE_IDENTIFIER:
             {
-                print_identifier(var->id, verbose);
+                print_identifier(stream, var->id);
             } break;
 
             case VARIABLE_CONSTANT:
             {
-                print_constant(var->constant, verbose);
+                print_constant(stream, var->constant);
             } break;
 
-            INVALID_DEFAULT_CASE;
+            default:
+            {
+                fprintf(stream.file, "INVALID");
+            } break;
         }
     }
-    if (verbose)
+    if (stream.verbose)
     {
-        fprintf(stdout, ")");
+        fprintf(stream.file, "]");
     }
 }
 
 internal void
-print_expression_op(Expression *expr, char *opstr, b32 verbose)
+print_expression_op(FileStream stream, Expression *expr, char *opstr)
 {
-    fprintf(stdout, "(%s ", opstr);
+    fprintf(stream.file, "(%s ", opstr);
     if (expr->leftKind == EXPRESSION_VAR)
     {
-        print_variable(expr->left, verbose);
+        print_variable(stream, expr->left);
     }
     else
     {
         i_expect(expr->leftKind == EXPRESSION_EXPR);
-        print_expression(expr->leftExpr, verbose);
+        print_expression(stream, expr->leftExpr);
     }
 
-    fprintf(stdout, " ");
+    fprintf(stream.file, " ");
 
     if (expr->rightKind == EXPRESSION_VAR)
     {
-        print_variable(expr->right, verbose);
+        print_variable(stream, expr->right);
     }
     else
     {
         i_expect(expr->rightKind == EXPRESSION_EXPR);
-        print_expression(expr->rightExpr, verbose);
+        print_expression(stream, expr->rightExpr);
     }
-    fprintf(stdout, ")");
+    fprintf(stream.file, ")");
 }
 
-#define CASE(name, printName) case EXPR_OP_##name: { print_expression_op(expr, #printName, verbose); } break
+#define CASE(name, printName) case EXPR_OP_##name: { print_expression_op(stream, expr, #printName); } break
 
 internal void
-print_expression(Expression *expr, b32 verbose)
+print_expression(FileStream stream, Expression *expr)
 {
-    if (verbose)
+    if (stream.verbose)
     {
-        fprintf(stdout, "(expr ");
+        fprintf(stream.file, "[expr ");
     }
     switch (expr->op)
     {
@@ -409,15 +460,15 @@ print_expression(Expression *expr, b32 verbose)
         {
             if (expr->leftKind == EXPRESSION_VAR)
             {
-                print_variable(expr->left, verbose);
+                print_variable(stream, expr->left);
             }
             else if (expr->leftKind == EXPRESSION_EXPR)
             {
-                print_expression(expr->leftExpr, verbose);
+                print_expression(stream, expr->leftExpr);
             }
             else
             {
-                fprintf(stdout, "EMPTY");
+                fprintf(stream.file, "EMPTY");
             }
         } break;
 
@@ -434,63 +485,67 @@ print_expression(Expression *expr, b32 verbose)
 
         INVALID_DEFAULT_CASE;
     }
+    if (stream.verbose)
+    {
+        fprintf(stream.file, "]");
+    }
 }
 
 #undef CASE
 
 internal void
-print_assignment(Assignment *assign, b32 verbose)
+print_assignment(FileStream stream, Assignment *assign)
 {
-    fprintf(stdout, "(assign ");
-    print_identifier(assign->id, verbose);
-    fprintf(stdout, " ");
-    print_expression(assign->expr, verbose);
-    fprintf(stdout, ")");
+    fprintf(stream.file, "(assign ");
+    print_identifier(stream, assign->id);
+    fprintf(stream.file, " ");
+    print_expression(stream, assign->expr);
+    fprintf(stream.file, ")");
 }
 
 internal void
-print_statement(Statement *statement, b32 verbose)
+print_statement(FileStream stream, Statement *statement)
 {
-    if (verbose)
+    if (stream.verbose)
     {
-        fprintf(stdout, "(stmt ");
+        fprintf(stream.file, "[stmt ");
     }
     switch (statement->kind)
     {
-        case STATEMENT_ASSIGN: print_assignment(statement->assign, verbose); break;
-        case STATEMENT_EXPR:   print_expression(statement->expr, verbose); break;
+        case STATEMENT_ASSIGN: print_assignment(stream, statement->assign); break;
+        case STATEMENT_EXPR:   print_expression(stream, statement->expr); break;
         INVALID_DEFAULT_CASE;
     }
-    if (verbose)
+    if (stream.verbose)
     {
-        fprintf(stdout, ")");
+        fprintf(stream.file, "]");
     }
 }
 
 internal void
-print_parsed_program(Program *program, b32 verbose)
+print_parsed_program(FileStream stream, Program *program)
 {
-    if (verbose)
+    if (stream.verbose)
     {
-        fprintf(stdout, "(program \n  ");
+        fprintf(stream.file, "[program \n  ");
     }
     for (u32 statementIndex = 0;
          statementIndex < program->nrStatements;
          ++statementIndex)
     {
         Statement *statement = program->statements + statementIndex;
-        print_statement(statement, verbose);
+        print_statement(stream, statement);
         if (statementIndex < (program->nrStatements - 1))
         {
-            fprintf(stdout, "\n%s", verbose ? "  " : "");
+            fprintf(stream.file, "\n%s", stream.verbose ? "  " : "");
         }
     }
-    if (verbose)
+    if (stream.verbose)
     {
-        fprintf(stdout, ")\n");
+        fprintf(stream.file, "]\n");
     }
     else
     {
-        fprintf(stdout, "\n");
+        fprintf(stream.file, "\n");
     }
 }
