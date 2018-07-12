@@ -69,24 +69,16 @@ int test_parse_identifiers(void)
 #undef TEST_ID
 #undef TEST_AGAIN
 
-// TODO(michiel): Correct spelling
-int test_parse_parentisize(void)
+int test_parse_parenthesize(void)
 {
-    FileStream testStream = {.file=stdout};
-    String parentisized = create_string("(4 + 5) * 2;");
-    String unparentisized = create_string("4 + 5 * 2;");
+    String parenthesized = str_internalize_cstring("(4 + 5) * 2;");
+    String unparenthesized = str_internalize_cstring("4 + 5 * 2;");
 
-    Token *tokenParen = tokenize_string(parentisized);
-    Token *tokenNonParen = tokenize_string(unparentisized);
+    Token *tokenParen = tokenize_string(parenthesized);
+    Token *tokenNonParen = tokenize_string(unparenthesized);
 
     Expression *exprParen = parse_expression(&tokenParen);
     Expression *exprNonParen = parse_expression(&tokenNonParen);
-
-    print_expression(testStream, exprParen);
-    fprintf(stdout, "\n");
-    print_expression(testStream, exprNonParen);
-    fprintf(stdout, "\n");
-    fflush(stdout);
 
     i_expect(exprNonParen);
     i_expect(exprNonParen->op == EXPR_OP_ADD);
@@ -170,7 +162,7 @@ int test_parser(void)
 {
     int errors = 0;
     errors |= test_parse_identifiers();
-    errors |= test_parse_parentisize();
+    errors |= test_parse_parenthesize();
     errors |= test_parse_statement();
     return errors;
 }
