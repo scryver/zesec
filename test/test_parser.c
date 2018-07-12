@@ -69,6 +69,164 @@ int test_parse_identifiers(void)
 #undef TEST_ID
 #undef TEST_AGAIN
 
+int test_parse_incdec(void)
+{
+    String tokenString = str_internalize_cstring("++a; --a; a++; a--; ++++a; ++--a; --++a; ----a; a++++; a++--; a--++; a----;");
+    Token *tokens = tokenize_string(tokenString);
+    Program *program = parse(tokens);
+
+    i_expect(program->nrStatements == 12);
+    for (u32 i = 0; i < program->nrStatements; ++i)
+    {
+        i_expect(program->statements[i].kind == STATEMENT_EXPR);
+    }
+
+    Expression *expr = program->statements[0].expr;
+    i_expect(expr->op == EXPR_OP_INC);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[1].expr;
+    i_expect(expr->op == EXPR_OP_DEC);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[2].expr;
+    i_expect(expr->op == EXPR_OP_INC);
+    i_expect(expr->leftKind == EXPRESSION_VAR);
+    i_expect(expr->left->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->left->id->name, str_internalize_cstring("a")));
+    i_expect(expr->rightKind == EXPRESSION_NULL);
+
+    expr = program->statements[3].expr;
+    i_expect(expr->op == EXPR_OP_DEC);
+    i_expect(expr->leftKind == EXPRESSION_VAR);
+    i_expect(expr->left->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->left->id->name, str_internalize_cstring("a")));
+    i_expect(expr->rightKind == EXPRESSION_NULL);
+
+    expr = program->statements[4].expr;
+    i_expect(expr->op == EXPR_OP_INC);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_EXPR);
+    i_expect(expr->rightExpr->op == EXPR_OP_INC);
+    i_expect(expr->rightExpr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightExpr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->rightExpr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->rightExpr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[5].expr;
+    i_expect(expr->op == EXPR_OP_INC);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_EXPR);
+    i_expect(expr->rightExpr->op == EXPR_OP_DEC);
+    i_expect(expr->rightExpr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightExpr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->rightExpr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->rightExpr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[6].expr;
+    i_expect(expr->op == EXPR_OP_DEC);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_EXPR);
+    i_expect(expr->rightExpr->op == EXPR_OP_INC);
+    i_expect(expr->rightExpr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightExpr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->rightExpr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->rightExpr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[7].expr;
+    i_expect(expr->op == EXPR_OP_DEC);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_EXPR);
+    i_expect(expr->rightExpr->op == EXPR_OP_DEC);
+    i_expect(expr->rightExpr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightExpr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->rightExpr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->rightExpr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[8].expr;
+    i_expect(expr->op == EXPR_OP_INC);
+    i_expect(expr->leftKind == EXPRESSION_EXPR);
+    i_expect(expr->leftExpr->op == EXPR_OP_INC);
+    i_expect(expr->leftExpr->leftKind == EXPRESSION_VAR);
+    i_expect(expr->leftExpr->left->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->leftExpr->left->id->name, str_internalize_cstring("a")));
+    i_expect(expr->leftExpr->rightKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_NULL);
+
+    expr = program->statements[9].expr;
+    i_expect(expr->op == EXPR_OP_DEC);
+    i_expect(expr->leftKind == EXPRESSION_EXPR);
+    i_expect(expr->leftExpr->op == EXPR_OP_INC);
+    i_expect(expr->leftExpr->leftKind == EXPRESSION_VAR);
+    i_expect(expr->leftExpr->left->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->leftExpr->left->id->name, str_internalize_cstring("a")));
+    i_expect(expr->leftExpr->rightKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_NULL);
+
+    expr = program->statements[10].expr;
+    i_expect(expr->op == EXPR_OP_INC);
+    i_expect(expr->leftKind == EXPRESSION_EXPR);
+    i_expect(expr->leftExpr->op == EXPR_OP_DEC);
+    i_expect(expr->leftExpr->leftKind == EXPRESSION_VAR);
+    i_expect(expr->leftExpr->left->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->leftExpr->left->id->name, str_internalize_cstring("a")));
+    i_expect(expr->leftExpr->rightKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_NULL);
+
+    expr = program->statements[11].expr;
+    i_expect(expr->op == EXPR_OP_DEC);
+    i_expect(expr->leftKind == EXPRESSION_EXPR);
+    i_expect(expr->leftExpr->op == EXPR_OP_DEC);
+    i_expect(expr->leftExpr->leftKind == EXPRESSION_VAR);
+    i_expect(expr->leftExpr->left->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->leftExpr->left->id->name, str_internalize_cstring("a")));
+    i_expect(expr->leftExpr->rightKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_NULL);
+
+    return 0;
+}
+
+int test_parse_unary(void)
+{
+    String tokenString = str_internalize_cstring("-a; ~a; !a;");
+    Token *tokens = tokenize_string(tokenString);
+    Program *program = parse(tokens);
+
+    i_expect(program->nrStatements == 3);
+    i_expect(program->statements[0].kind == STATEMENT_EXPR);
+    i_expect(program->statements[1].kind == STATEMENT_EXPR);
+    i_expect(program->statements[2].kind == STATEMENT_EXPR);
+
+    Expression *expr = program->statements[0].expr;
+    i_expect(expr->op == EXPR_OP_SUB);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[1].expr;
+    i_expect(expr->op == EXPR_OP_INV);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->right->id->name, str_internalize_cstring("a")));
+
+    expr = program->statements[2].expr;
+    i_expect(expr->op == EXPR_OP_NOT);
+    i_expect(expr->leftKind == EXPRESSION_NULL);
+    i_expect(expr->rightKind == EXPRESSION_VAR);
+    i_expect(expr->right->kind == VARIABLE_IDENTIFIER);
+    i_expect(strings_are_equal(expr->right->id->name, str_internalize_cstring("a")));
+
+    return 0;
+}
+
 int test_parse_parenthesize(void)
 {
     String parenthesized = str_internalize_cstring("(4 + 5) * 2;");
@@ -162,6 +320,7 @@ int test_parser(void)
 {
     int errors = 0;
     errors |= test_parse_identifiers();
+    errors |= test_parse_incdec();
     errors |= test_parse_parenthesize();
     errors |= test_parse_statement();
     return errors;

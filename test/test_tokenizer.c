@@ -6,12 +6,12 @@
 
 #define TEST_TOKEN(token, type, string) i_expect(token); \
     i_expect(token->kind == TOKEN_##type); \
-    i_expect(strings_are_equal(token->value, create_string(string))); \
+    i_expect(strings_are_equal(token->value, str_internalize_cstring(string))); \
     token = token->nextToken
 
 int test_token_open_close(void)
 {
-    String tokenString = create_string("( ) (() (())(;");
+    String tokenString = str_internalize_cstring("( ) (() (())(;");
     Token *tokens = tokenize_string(tokenString);
 
     Token *curToken = tokens;
@@ -29,9 +29,97 @@ int test_token_open_close(void)
     return 0;
 }
 
+int test_token_incdec(void)
+{
+    String tokenString = str_internalize_cstring("++a; --a; a++; a--; ++++a; ++--a; --++a; ----a; a++++; a++--; a--++; a----;");
+    Token *tokens = tokenize_string(tokenString);
+
+    Token *curToken = tokens;
+
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, INC, "++");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, DEC, "--");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    return 0;
+}
+
+int test_token_unary(void)
+{
+    String tokenString = str_internalize_cstring("-a; !a; ~a;");
+    Token *tokens = tokenize_string(tokenString);
+
+    Token *curToken = tokens;
+
+    TEST_TOKEN(curToken, SUB, "-");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, NOT, "!");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    TEST_TOKEN(curToken, INV, "~");
+    TEST_TOKEN(curToken, ID, "a");
+    TEST_TOKEN(curToken, SEMI, ";");
+
+    return 0;
+}
+
 int test_token_base(void)
 {
-    String tokenString = create_string("ab = _ask92; _02 + 0239; / * << >> >>> ^ & | \n\tce = 0;");
+    String tokenString = str_internalize_cstring("ab = _ask92; _02 + 0239; / * << >> >>> ^ & | \n\tce = 0;");
     Token *tokens = tokenize_string(tokenString);
 
     Token *curToken = tokens;
@@ -65,6 +153,8 @@ int test_tokenizer(void)
 {
     int errors = 0;
     errors |= test_token_open_close();
+    errors |= test_token_incdec();
+    errors |= test_token_unary();
     errors |= test_token_base();
     return errors;
 }

@@ -51,6 +51,14 @@ tokenize(Buffer buffer, String filename)
         {
             SIMPLE_TOKEN(PAREN_CLOSE);
         }
+        else if (eater.scanner[0] == '!')
+        {
+            SIMPLE_TOKEN(NOT);
+        }
+        else if (eater.scanner[0] == '~')
+        {
+            SIMPLE_TOKEN(INV);
+        }
         else if (eater.scanner[0] == '*')
         {
             SIMPLE_TOKEN(MUL);
@@ -69,8 +77,7 @@ tokenize(Buffer buffer, String filename)
             {
                 // NOTE(michiel): >> == Logical right shift
                 token = next_token(result, tokenIndex++);
-                token->value.size = 2;
-                token->value.data = (u8 *)eater.scanner;
+                token->value = str_internalize((String){.size=2, .data=(u8 *)eater.scanner});
                 token->kind = TOKEN_SLL;
                 token->colNumber = eater.columnNumber;
                 advance(&eater);
@@ -88,17 +95,20 @@ tokenize(Buffer buffer, String filename)
             {
                 // NOTE(michiel): >> == Logical right shift
                 token = next_token(result, tokenIndex++);
-                token->value.size = 2;
-                token->value.data = (u8 *)eater.scanner;
+                String value = {
+                    .size = 2,
+                    .data = (u8 *)eater.scanner,
+                };
                 token->kind = TOKEN_SRA;
                 token->colNumber = eater.columnNumber;
                 if (eater.scanner[2] && (eater.scanner[2] == '>'))
                 {
                     // NOTE(michiel): >>> == Logical right shift
-                    ++token->value.size;
+                    ++value.size;
                     token->kind = TOKEN_SRL;
                     advance(&eater);
                 }
+                token->value = str_internalize(value);
                 advance(&eater);
                 advance(&eater);
             }
@@ -110,11 +120,35 @@ tokenize(Buffer buffer, String filename)
         }
         else if (eater.scanner[0] == '-')
         {
-            SIMPLE_TOKEN(SUB);
+            if (eater.scanner[1] && (eater.scanner[1] == '-'))
+            {
+                token = next_token(result, tokenIndex++);
+                token->value = str_internalize((String){.size=2, .data=(u8 *)eater.scanner});
+                token->kind = TOKEN_DEC;
+                token->colNumber = eater.columnNumber;
+                advance(&eater);
+                advance(&eater);
+            }
+            else
+            {
+                SIMPLE_TOKEN(SUB);
+            }
         }
         else if (eater.scanner[0] == '+')
         {
-            SIMPLE_TOKEN(ADD);
+            if (eater.scanner[1] && (eater.scanner[1] == '+'))
+            {
+                token = next_token(result, tokenIndex++);
+                token->value = str_internalize((String){.size=2, .data=(u8 *)eater.scanner});
+                token->kind = TOKEN_INC;
+                token->colNumber = eater.columnNumber;
+                advance(&eater);
+                advance(&eater);
+            }
+            else
+            {
+                SIMPLE_TOKEN(ADD);
+            }
         }
         else if (eater.scanner[0] == '|')
         {
@@ -230,6 +264,10 @@ print_token_kind(FileStream fileStream, Token *token)
         CASE(NULL);
         CASE(NUMBER);
         CASE(ID);
+        CASE(INC);
+        CASE(DEC);
+        CASE(INV);
+        CASE(NOT);
         CASE(MUL);
         CASE(DIV);
         CASE(AND);

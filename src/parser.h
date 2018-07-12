@@ -27,6 +27,10 @@ typedef struct Variable
 typedef enum ExpressionOp
 {
     EXPR_OP_NOP,
+    EXPR_OP_INC,
+    EXPR_OP_DEC,
+    EXPR_OP_INV,
+    EXPR_OP_NOT,
     EXPR_OP_MUL,
     EXPR_OP_DIV,
     EXPR_OP_AND,
