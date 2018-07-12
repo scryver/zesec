@@ -8,6 +8,35 @@
 #include "../src/parser.c"
 #include "../src/interpreter.c"
 
+int test_interpret_expr_ops(void)
+{
+    String tokenString = str_internalize_cstring("3 * 2; 3 / 2; 3 & 2; 3 << 2; (0-1) >> 2; (0-1) >>> 2; 3 - 2; 3 + 2; 3 | 2; 3 ^ 2;");
+    Token *tokens = tokenize_string(tokenString);
+    Program *program = parse(tokens);
+
+    i_expect(program);
+    i_expect(program->nrStatements == 10);
+
+    s32 values[10] = {0};
+    for (u32 i = 0; i < program->nrStatements; ++i)
+    {
+        i_expect(program->statements[i].kind == STATEMENT_EXPR);
+        values[i] = interpret_expression(program->statements[i].expr);
+    }
+    i_expect(values[0] == (3 * 2));
+    i_expect(values[1] == (3 / 2));
+    i_expect(values[2] == (3 & 2));
+    i_expect(values[3] == (3 << 2));
+    i_expect(values[4] == (-1 >> 2));
+    i_expect(values[5] == ((u32)U32_MAX >> 2));
+    i_expect(values[6] == (3 - 2));
+    i_expect(values[7] == (3 + 2));
+    i_expect(values[8] == (3 | 2));
+    i_expect(values[9] == (3 ^ 2));
+
+    return 0;
+}
+
 int test_interpret_expr(void)
 {
     String tokenString = str_internalize_cstring("4 + 1;");
@@ -99,8 +128,11 @@ int test_interpret_program(void)
 int test_interpreter(void)
 {
     int errors = 0;
+    errors |= test_interpret_expr_ops();
     errors |= test_interpret_expr();
     errors |= test_interpret_assign();
+    errors |= test_interpret_multi_statements();
+    errors |= test_interpret_program();
     return errors;
 }
 
